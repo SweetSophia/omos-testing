@@ -165,7 +165,7 @@ async function runInstall(config: InstallConfig): Promise<number> {
   }
 
   // Install skills if requested
-  if (!modelsOnly && config.installSkills) {
+  if (config.installSkills) {
     printStep(step++, totalSteps, 'Installing recommended skills...');
     if (config.dryRun) {
       printInfo('Dry run mode - would install skills:');
@@ -190,7 +190,7 @@ async function runInstall(config: InstallConfig): Promise<number> {
   }
 
   // Install custom skills if requested
-  if (!modelsOnly && config.installCustomSkills) {
+  if (config.installCustomSkills) {
     printStep(step++, totalSteps, 'Installing custom skills...');
     if (config.dryRun) {
       printInfo('Dry run mode - would install custom skills:');

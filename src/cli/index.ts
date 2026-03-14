@@ -36,7 +36,6 @@ Options:
   --skills=yes|no        Install recommended skills (yes/no)
   --no-tui               Non-interactive mode
   --dry-run              Simulate install without writing files
-  --models-only          Update model assignments only (skip plugin/skills)
   -h, --help             Show this help message
 
 The installer generates an OpenAI configuration by default.
