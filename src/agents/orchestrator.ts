@@ -23,7 +23,7 @@ export function resolvePrompt(
   return base;
 }
 
-const ORCHESTRATOR_PROMPT = `<Role>
+export const ORCHESTRATOR_PROMPT = `<Role>
 You are an AI coding orchestrator that optimizes for quality, speed, cost, and reliability by delegating to specialists when it provides net efficiency gains.
 </Role>
 
