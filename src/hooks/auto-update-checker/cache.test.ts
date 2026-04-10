@@ -1,18 +1,17 @@
 import { describe, expect, mock, spyOn, test } from 'bun:test';
 import * as fs from 'node:fs';
 
-// Mock internal dependencies
-mock.module('./constants', () => ({
-  CACHE_DIR: '/mock/cache',
-  PACKAGE_NAME: 'oh-my-opencode-slim',
-}));
-
+// Mock logger to avoid noise
 mock.module('../../utils/logger', () => ({
   log: mock(() => {}),
 }));
 
 mock.module('../../cli/config-manager', () => ({
   stripJsonComments: (s: string) => s,
+  getOpenCodeConfigPaths: () => [
+    '/mock/config/opencode.json',
+    '/mock/config/opencode.jsonc',
+  ],
 }));
 
 // Cache buster for dynamic imports
@@ -62,7 +61,12 @@ describe('auto-update-checker/cache', () => {
           },
         }),
       );
-      const writeSpy = spyOn(fs, 'writeFileSync').mockReturnValue(undefined);
+      const writtenData: string[] = [];
+      const writeSpy = spyOn(fs, 'writeFileSync').mockImplementation(
+        (_path: string, data: string) => {
+          writtenData.push(data);
+        },
+      );
       const { invalidatePackage } = await import(
         `./cache?test=${importCounter++}`
       );
@@ -70,8 +74,8 @@ describe('auto-update-checker/cache', () => {
       const result = invalidatePackage();
 
       expect(result).toBe(true);
-      const callArgs = writeSpy.mock.calls[0];
-      const savedJson = JSON.parse(callArgs[1]);
+      expect(writtenData.length).toBeGreaterThan(0);
+      const savedJson = JSON.parse(writtenData[0]);
       expect(savedJson.dependencies['oh-my-opencode-slim']).toBeUndefined();
       expect(savedJson.dependencies['other-pkg']).toBe('1.0.0');
 
