@@ -19,113 +19,168 @@ export function renderInterviewPage(interviewId: string): string {
         margin: 0; 
         background: #000000; 
         color: #ffffff; 
-        line-height: 1.5;
+        line-height: 1.6;
         -webkit-font-smoothing: antialiased;
+        font-size: 16px;
       }
-      .wrap { max-width: 640px; margin: 0 auto; padding: 48px 24px; }
+      .wrap { max-width: 680px; margin: 0 auto; padding: 56px 24px; }
       .brand-header {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 14px;
-        margin-bottom: 28px;
+        gap: 16px;
+        margin-bottom: 32px;
         text-align: center;
       }
       .brand-mark {
-        width: 132px;
-        height: 132px;
+        width: 144px;
+        height: 144px;
         object-fit: contain;
-        filter: drop-shadow(0 10px 30px rgba(255,255,255,0.08));
+        filter: drop-shadow(0 10px 30px rgba(255,255,255,0.1));
       }
-      h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px; }
-      h2 { font-size: 16px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; }
-      h3 { font-size: 15px; font-weight: 500; margin-bottom: 16px; line-height: 1.4; }
+      h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 12px; line-height: 1.2; }
+      h2 { font-size: 18px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; }
+      h3 { font-size: 18px; font-weight: 500; margin-bottom: 16px; line-height: 1.4; }
       p { margin-top: 0; }
-      .muted { color: rgba(255,255,255,0.5); font-size: 14px; }
-      .meta { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.4); margin-bottom: 32px; letter-spacing: 0.05em; text-transform: uppercase; }
+      .muted { color: rgba(255,255,255,0.5); font-size: 16px; }
+      .meta { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 16px; letter-spacing: 0.05em; text-transform: uppercase; }
+      
+      .file-path-container {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        color: rgba(255,255,255,0.6);
+        background: rgba(255,255,255,0.05);
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 36px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      .file-path-icon {
+        opacity: 0.5;
+      }
       
       .question { 
         background: rgba(255,255,255,0.02); 
         border: 1px solid rgba(255,255,255,0.1); 
-        border-radius: 4px; 
-        padding: 24px; 
-        margin-bottom: 24px; 
-        transition: border-color 0.2s ease;
+        border-left: 1px solid rgba(255,255,255,0.1);
+        border-radius: 6px; 
+        padding: 28px; 
+        margin-bottom: 32px; 
+        transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
       }
       .question:focus-within {
         border-color: rgba(255,255,255,0.3);
       }
       
+      /* Make active question much clearer */
       .question.active-question {
+        background: rgba(255,255,255,0.04);
         border-color: rgba(255,255,255,0.4);
-        box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
+        border-left: 4px solid #ffffff;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+        transform: translateX(4px);
       }
       
-      .options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+      .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+      
       .option { 
         border: 1px solid rgba(255,255,255,0.1); 
         background: transparent; 
         color: inherit; 
-        border-radius: 4px; 
-        padding: 12px 16px; 
+        border-radius: 6px; 
+        padding: 14px 18px; 
         cursor: pointer; 
         text-align: left;
-        font-size: 14px;
+        font-size: 16px;
         transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
       }
       .option:hover {
-        background: rgba(255,255,255,0.05);
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.3);
       }
       .option.selected { 
         background: #ffffff; 
         color: #000000; 
         border-color: #ffffff; 
+        font-weight: 500;
       }
       
       .shortcut {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         background: rgba(255,255,255,0.1);
-        color: rgba(255,255,255,0.7);
+        color: rgba(255,255,255,0.8);
         border-radius: 4px;
-        padding: 2px 6px;
-        font-size: 11px;
-        margin-right: 8px;
-        font-family: monospace;
-        vertical-align: middle;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 4px;
+        font-size: 12px;
+        margin-right: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
       .option.selected .shortcut {
-        background: rgba(0,0,0,0.1);
-         color: rgba(0,0,0,0.7);
-       }
+        background: rgba(0,0,0,0.15);
+        color: rgba(0,0,0,0.9);
+      }
+       
+      .option-text {
+        flex: 1;
+        line-height: 1.4;
+      }
+
+      .recommended-badge {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: rgba(255,255,255,0.15);
+        color: rgba(255,255,255,0.9);
+        padding: 4px 8px;
+        border-radius: 999px;
+        margin-left: 12px;
+        font-weight: 600;
+      }
+      .option.selected .recommended-badge {
+        background: rgba(0,0,0,0.15);
+        color: rgba(0,0,0,0.8);
+      }
 
       .submit-shortcut {
         display: inline-block;
         margin-left: 10px;
-        padding: 2px 8px;
+        padding: 3px 8px;
         border-radius: 999px;
         background: rgba(0,0,0,0.08);
         color: rgba(0,0,0,0.7);
-        font-size: 11px;
+        font-size: 12px;
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
       
       textarea { 
         width: 100%; 
         box-sizing: border-box;
-        min-height: 120px; 
-        border-radius: 4px; 
-        border: 1px solid rgba(255,255,255,0.1); 
-        background: rgba(0,0,0,0.5); 
+        min-height: 140px; 
+        border-radius: 6px; 
+        border: 1px solid rgba(255,255,255,0.15); 
+        background: rgba(0,0,0,0.6); 
         color: inherit; 
         padding: 16px; 
         font-family: inherit;
-        font-size: 14px;
+        font-size: 16px;
+        line-height: 1.5;
         resize: vertical;
         outline: none;
+        transition: border-color 0.2s ease;
       }
-       textarea:focus {
-         border-color: rgba(255,255,255,0.3);
-       }
+      textarea:focus {
+        border-color: rgba(255,255,255,0.5);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
+      }
 
       .hidden-textarea {
         display: none;
@@ -135,16 +190,20 @@ export function renderInterviewPage(interviewId: string): string {
         background: #ffffff; 
         color: #000000; 
         border: 0; 
-        border-radius: 4px; 
-        padding: 12px 24px; 
-        font-size: 14px;
-        font-weight: 500;
+        border-radius: 6px; 
+        padding: 16px 24px; 
+        font-size: 16px;
+        font-weight: 600;
         cursor: pointer; 
         width: 100%;
-        transition: opacity 0.2s ease;
+        transition: opacity 0.2s ease, transform 0.1s ease;
       }
-      button.primary:hover {
+      button.primary:hover:not(:disabled) {
         opacity: 0.9;
+        transform: translateY(-1px);
+      }
+      button.primary:active:not(:disabled) {
+        transform: translateY(1px);
       }
       button.primary:disabled { 
         opacity: 0.3; 
@@ -154,15 +213,15 @@ export function renderInterviewPage(interviewId: string): string {
       .footer {
         margin-top: 32px;
         text-align: center;
-        font-size: 12px;
-        color: rgba(255,255,255,0.3);
+        font-size: 13px;
+        color: rgba(255,255,255,0.4);
       }
 
       /* Loading State Overlay */
       .loading-overlay {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.85);
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -170,29 +229,20 @@ export function renderInterviewPage(interviewId: string): string {
         z-index: 100;
         opacity: 0;
         pointer-events: none;
-        backdrop-filter: blur(4px);
+        backdrop-filter: blur(8px);
+        transition: opacity 0.3s ease;
       }
       .loading-overlay.active {
         opacity: 1;
         pointer-events: all;
       }
-      .spinner {
-        width: 24px;
-        height: 24px;
-        border: 2px solid rgba(255,255,255,0.1);
-        border-top-color: #ffffff;
-        border-radius: 50%;
-        margin-bottom: 16px;
-      }
       
-      /* Only CSS animation allowed as per "no animations needed" is just the spinner if needed, 
-         but we can just use static "Loading..." text if we truly mean 0 animations, but a spinner is standard.
-         Let's stick to simple text for zero animations */
       .loading-overlay .status-text {
-        font-size: 14px;
+        font-size: 15px;
         letter-spacing: 0.1em;
         text-transform: uppercase;
         color: #ffffff;
+        font-weight: 500;
       }
     </style>
   </head>
@@ -211,6 +261,11 @@ export function renderInterviewPage(interviewId: string): string {
       <div class="meta">
         <span id="status">INITIALIZING</span>
         <span>OH MY OPENCODE SLIM</span>
+      </div>
+      
+      <div id="filePathContainer" class="file-path-container" style="display: none;">
+        <span class="file-path-icon">📄</span>
+        <span id="markdownPath"></span>
       </div>
 
       <div id="questions"></div>
@@ -270,8 +325,17 @@ export function renderInterviewPage(interviewId: string): string {
         }
         
         const text = document.createElement('span');
+        text.className = 'option-text';
         text.textContent = isCustom ? 'Custom' : option;
         button.appendChild(text);
+
+        // Visual marking for suggested/recommended answers
+        if (!isCustom && question.suggested === option) {
+          const badge = document.createElement('span');
+          badge.className = 'recommended-badge';
+          badge.textContent = 'Recommended';
+          button.appendChild(badge);
+        }
 
         button.addEventListener('click', () => {
           const questions = state.data?.questions || [];
@@ -518,6 +582,17 @@ export function renderInterviewPage(interviewId: string): string {
         document.getElementById('idea').textContent = data.interview.idea || 'Interview';
         document.getElementById('summary').textContent = data.summary || 'Session in progress.';
         document.getElementById('status').textContent = data.mode.toUpperCase();
+        
+        // Render Markdown Path
+        const pathContainer = document.getElementById('filePathContainer');
+        const pathElement = document.getElementById('markdownPath');
+        const mdPath = data.markdownPath || (data.interview && data.interview.markdownPath);
+        if (mdPath) {
+          pathElement.textContent = mdPath;
+          pathContainer.style.display = 'flex';
+        } else {
+          pathContainer.style.display = 'none';
+        }
         
         renderQuestions(data.questions || []);
         updateSubmitButton();

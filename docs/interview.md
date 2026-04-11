@@ -1,111 +1,59 @@
-# Interview Feature Guide
+# Interview
 
-`/interview` gives you a browser companion for the current OpenCode session.
+`/interview` opens a local browser UI for refining a feature idea inside the same OpenCode session.
 
-Instead of answering everything inside the CLI/TUI, you can open a local page, click suggested answers, type custom ones when needed, and keep a live markdown spec growing inside your repo.
+Use it when chat feels too loose and you want a cleaner question/answer flow plus a markdown spec saved in your repo.
 
-## What it does
+> Tip: `/interview` usually works well with a fast model. If the flow feels slower than it should, switch models in OpenCode with `Ctrl+X`, then `m`, and pick a faster one.
 
-`/interview` is designed for turning a rough idea into a clearer product spec through short Q&A rounds.
+## Quick start
 
-You start from OpenCode:
-
-```text
-/interview build a simple todo app for small teams
-```
-
-That opens a localhost interview UI connected to the **same OpenCode session**.
-
-From there you can:
-
-- answer the current questions in the browser
-- use suggested/default answers to move faster
-- use keyboard shortcuts for quick selection
-- submit answers back into the same session
-- keep a markdown document updated in `interview/*.md` by default
-- have the file automatically renamed based on the assistant's concise title
-
----
-
-## Why use it
-
-The browser flow is better when you want:
-
-- a cleaner product-discovery loop than raw chat
-- faster answering with click-to-select options
-- a visible, growing markdown artifact in the repo
-- less friction when iterating on feature requirements
-
-It is especially useful for:
-
-- feature planning
-- product-spec interviews
-- requirement clarification before implementation
-- turning vague ideas into a working brief the agent can build from
-
----
-
-## How it works
-
-### 1. Start the interview
-
-Run:
-
-```text
-/interview <your idea>
-```
-
-Example:
+Start a new interview:
 
 ```text
 /interview build a kanban app for design teams
 ```
 
-OpenCode will post a local URL in the session and automatically open your default browser (if enabled).
+What happens:
 
----
+1. OpenCode starts the interview in your current session
+2. a localhost page opens in your browser by default
+3. the UI shows the current questions and suggested answers
+4. answers are submitted back into the same session
+5. a markdown spec is updated in your repo
 
-### 2. Open the interview page
-
-You will see a localhost link like this:
+OpenCode posts a localhost URL like this:
 
 ![Interview URL](../img/interview-url.png)
 
-The browser should open automatically. If it doesn't, click the link.
-
----
-
-### 3. Answer in the browser
-
-The page keeps the focus on the current questions only.
-
-- suggested answers are selected by default when present
-- number keys can select options quickly
-- `Custom` opens a text field for freeform input
-- after picking the first answer, the UI moves you toward the next question
-
-Current UI:
+And the browser UI looks like this:
 
 ![Interview website](../img/interview-website.png)
 
----
+Resume an existing interview:
 
-### 4. Submit answers back into OpenCode
+```text
+/interview interview/kanban-design-tool.md
+```
 
-When you submit, the browser sends those answers back into the **same session**.
+You can also resume by basename if it exists in the configured output folder:
 
-The agent then:
+```text
+/interview kanban-design-tool
+```
 
-- updates its understanding
-- asks the next highest-value questions
-- refreshes the markdown spec in your repo
-- suggests a concise filename (e.g., `kanban-design-tool.md`)
+## What the browser UI gives you
 
----
+- focused question flow instead of open-ended chat
+- suggested answers, clearly marked as recommended
+- keyboard-driven selection for the active question
+- custom freeform answers when needed
+- visible path to the markdown interview file
+- larger, more readable interview UI
 
-## Output: live markdown file
+## Markdown output
 
-The durable output is a markdown file written directly into:
+By default, interview files are written to:
 
 ```text
 interview/
@@ -117,14 +65,19 @@ Example:
 interview/kanban-design-tool.md
 ```
 
-The file looks like this:
+The file contains two sections:
+
+- `Current spec` — rewritten as the interview becomes clearer
+- `Q&A history` — append-only question/answer record
+
+Example:
 
 ```md
 # Kanban App For Design Teams
 
 ## Current spec
 
-A collaborative kanban tool for design teams with shared boards, lightweight comments, and web-first workflows.
+A collaborative kanban tool for design teams with shared boards, comments, and web-first workflows.
 
 ## Q&A history
 
@@ -133,117 +86,65 @@ A: Design teams
 
 Q: Is this web only or mobile too?
 A: Web first
-
-Q: Should boards be private or shared by default?
-A: Shared by default
 ```
 
-Notes:
+### How filenames are chosen
 
-- `Current spec` is refreshed as the interview evolves
-- `Q&A history` is append-only
-- answer options are **not** written into the markdown history
-- the filename is based on the assistant's `title` field (kebab-case, concise)
-- if the assistant omits the title, the filename uses a slugified version of your original input
+For new interviews, the assistant can suggest a concise title for the markdown filename.
 
-You can also configure:
+Example:
 
-- the maximum number of questions returned in each round
-- the output folder for interview markdown files
-- whether to automatically open the browser
+- user input: `build a kanban app for design teams with lightweight reviews`
+- file: `interview/kanban-design-tool.md`
 
-And if you run `/interview` with an existing markdown path or basename, the interview resumes from that file instead of starting a new one.
-
----
-
-## Configuration
-
-Add interview settings to your OpenCode config:
-
-```jsonc
-{
-  "plugin": ["oh-my-opencode-slim"],
-  "oh-my-opencode-slim": {
-    "interview": {
-      "maxQuestions": 2,          // Questions per round (1-10, default: 2)
-      "outputFolder": "interview", // Where to save markdown files
-      "autoOpenBrowser": true      // Auto-open browser on start (default: true)
-    }
-  }
-}
-```
-
-### autoOpenBrowser
-
-When enabled (default), the plugin automatically opens your default browser to the interview URL when you start a new interview. This works on macOS (`open`), Linux (`xdg-open`), and Windows (`start`). If opening fails, the error is logged but the interview continues normally.
-
-The browser only opens once per interview (on initial creation/resume), not on every status update or poll.
-
----
+If the assistant does not provide a title, the original input is slugified as a fallback.
 
 ## Keyboard shortcuts
 
 Inside the interview page:
 
-- `1`, `2`, `3`, ... select the visible answer options for the active question
+- `1`, `2`, `3`, ... select options for the active question
 - the last number selects `Custom`
-- `↑` / `↓` move between questions
+- `↑` / `↓` move the active question
 - `Cmd+Enter` or `Ctrl+Enter` submits
 - `Cmd+S` or `Ctrl+S` also submits
 
----
+## Configuration
 
-## Suggested answer flow
+```jsonc
+{
+  "oh-my-opencode-slim": {
+    "interview": {
+      "maxQuestions": 2,
+      "outputFolder": "interview",
+      "autoOpenBrowser": true
+    }
+  }
+}
+```
 
-When the agent provides a suggested answer:
+### Options
 
-- it is selected by default to reduce friction
-- you can accept it instantly
-- or switch to another option
-- or choose `Custom` and write your own answer
+- `maxQuestions` — max questions per round, `1-10`, default `2`
+- `outputFolder` — where markdown files are written, default `interview`
+- `autoOpenBrowser` — open the localhost UI in your default browser, default `true`
 
-This keeps the flow fast without forcing you into the default.
+## Good use cases
 
----
-
-## What makes it different from normal chat
-
-Normal chat is flexible, but interviews are usually faster in a focused UI.
-
-`/interview` gives you:
-
-- one active question flow
-- structured answer selection
-- less noisy back-and-forth
-- a repo-local markdown artifact from the start
-- automatic, meaningful filenames based on the assistant's understanding
-
-It is not a replacement for chat — it is a better input mode for specification work.
-
----
+- feature planning
+- requirement clarification before implementation
+- turning a rough idea into a spec the agent can build from
+- keeping a lightweight product brief in the repo while iterating
 
 ## Current limitations
 
-- localhost only by default
-- browser page polls for updates instead of using real-time push
-- runtime interview state is not meant to survive plugin restarts the way the markdown file does
-- the feature depends on the assistant returning structured `<interview_state>` blocks
-
----
-
-## Best use cases
-
-Use `/interview` when you want to say things like:
-
-- "Help me define this feature before building it."
-- "Turn this rough idea into a clearer spec."
-- "Ask me the right product questions one step at a time."
-- "Write the evolving spec into the repo while we refine it."
-
----
+- localhost UI only
+- browser updates use polling, not realtime push
+- runtime interview state is in-memory; the markdown file is the durable artifact
+- the flow depends on the assistant returning valid `<interview_state>` blocks
 
 ## Related
 
-- Main documentation index: [README.md](../README.md)
-- Tools and built-ins: [docs/tools.md](tools.md)
-- Configuration reference: [docs/configuration.md](configuration.md)
+- [README.md](../README.md)
+- [tools.md](tools.md)
+- [configuration.md](configuration.md)
