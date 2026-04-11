@@ -12,6 +12,7 @@ export interface InterviewAnswer {
 
 export interface InterviewAssistantState {
   summary: string;
+  title?: string;
   questions: InterviewQuestion[];
 }
 

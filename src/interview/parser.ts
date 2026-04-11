@@ -62,7 +62,10 @@ export function buildFallbackState(
   };
 }
 
-export function parseAssistantState(text: string): {
+export function parseAssistantState(
+  text: string,
+  maxQuestions = 2,
+): {
   state: InterviewAssistantState | null;
   error?: string;
 } {
@@ -75,6 +78,10 @@ export function parseAssistantState(text: string): {
     const parsed = JSON.parse(match[1]) as Record<string, unknown>;
     const summary =
       typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+    const title =
+      typeof parsed.title === 'string' && parsed.title.trim().length > 0
+        ? parsed.title.trim()
+        : undefined;
     const questions = Array.isArray(parsed.questions)
       ? parsed.questions
           .filter(
@@ -83,12 +90,13 @@ export function parseAssistantState(text: string): {
           )
           .map((value, index) => normalizeQuestion(value, index))
           .filter((value): value is InterviewQuestion => value !== null)
-          .slice(0, 2)
+          .slice(0, maxQuestions)
       : [];
 
     return {
       state: {
         summary,
+        title,
         questions,
       },
     };
@@ -103,7 +111,10 @@ export function parseAssistantState(text: string): {
   }
 }
 
-export function findLatestAssistantState(messages: InterviewMessage[]): {
+export function findLatestAssistantState(
+  messages: InterviewMessage[],
+  maxQuestions = 2,
+): {
   state: InterviewAssistantState | null;
   latestAssistantError?: string;
 } {
@@ -113,7 +124,7 @@ export function findLatestAssistantState(messages: InterviewMessage[]): {
       continue;
     }
 
-    const parsed = parseAssistantState(flattenMessage(message));
+    const parsed = parseAssistantState(flattenMessage(message), maxQuestions);
     if (parsed.state) {
       return {
         state: parsed.state,

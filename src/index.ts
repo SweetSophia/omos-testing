@@ -172,7 +172,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
     autoEnable: config.todoContinuation?.autoEnable ?? false,
     autoEnableThreshold: config.todoContinuation?.autoEnableThreshold ?? 4,
   });
-  const interviewManager = createInterviewManager(ctx);
+  const interviewManager = createInterviewManager(ctx, config);
 
   return {
     name: 'oh-my-opencode-slim',

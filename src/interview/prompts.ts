@@ -18,24 +18,19 @@ function formatQuestionContext(questions: InterviewQuestion[]): string {
     .join('\n\n');
 }
 
-export function buildKickoffPrompt(idea: string): string {
+export function buildKickoffPrompt(idea: string, maxQuestions: number): string {
   return [
     'You are running an interview q&a session for the user inside their repository.',
     `Initial idea: ${idea}`,
-    'Clarify the idea through short rounds of at most 2 questions at a time.',
+    `Clarify the idea through short rounds of at most ${maxQuestions} questions at a time.`,
     'When useful, each question may include 2 to 4 answer options and one suggested option.',
     'Be practical. Focus on the highest-ambiguity and highest-risk decisions first.',
     'After any short human-friendly preface, you MUST include a machine-readable block in this exact format:',
     '<interview_state>',
     '{',
     '  "summary": "one short paragraph about the current understanding",',
+    '  "title": "concise-kebab-case-title-for-filename",',
     '  "questions": [',
-    '    {',
-    '      "id": "short-kebab-id",',
-    '      "question": "question text",',
-    '      "options": ["option 1", "option 2", "option 3"],',
-    '      "suggested": "best suggested option"',
-    '    },',
     '    {',
     '      "id": "short-kebab-id-2",',
     '      "question": "question text",',
@@ -46,15 +41,34 @@ export function buildKickoffPrompt(idea: string): string {
     '}',
     '</interview_state>',
     'Rules:',
-    '- Return 0 to 2 questions.',
+    `- Return 0 to ${maxQuestions} questions.`,
     '- If there are no more useful questions, return zero questions.',
-    '- Do not ask more than 2 questions in one round.',
+    `- Do not ask more than ${maxQuestions} questions in one round.`,
+    '- Provide a concise "title" field (kebab-case, 3-6 words) suitable for a filename.',
+  ].join('\n');
+}
+
+export function buildResumePrompt(
+  document: string,
+  maxQuestions: number,
+): string {
+  return [
+    'Resume the interview from this existing markdown document.',
+    'Use the current spec and Q&A history as ground truth so far.',
+    'Do not restart from scratch.',
+    '',
+    document,
+    '',
+    `Ask the next highest-value clarifying questions, up to ${maxQuestions} at a time.`,
+    'If there are no more useful questions, return zero questions.',
+    'Return the same <interview_state> JSON block format as before.',
   ].join('\n');
 }
 
 export function buildAnswerPrompt(
   answers: Array<{ questionId: string; answer: string }>,
   questions: InterviewQuestion[],
+  maxQuestions: number,
 ): string {
   const answerText = answers
     .map(
@@ -70,7 +84,7 @@ export function buildAnswerPrompt(
     'The user answered:',
     answerText,
     'Now update your understanding and ask the next highest-value clarifying questions.',
-    'Return 0 to 2 questions. If there are no more useful questions, return zero questions.',
+    `Return 0 to ${maxQuestions} questions. If there are no more useful questions, return zero questions.`,
     'Return the same <interview_state> JSON block format as before.',
   ].join('\n\n');
 }

@@ -1,7 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { createInterviewService } from './service';
+import { createInterviewService as createRealInterviewService } from './service';
 import type { InterviewAnswer } from './types';
 import { renderInterviewPage } from './ui';
 
@@ -56,9 +56,41 @@ function extractInterviewIdFromLastPrompt(promptMock: {
   return match ? match[1] : null;
 }
 
+// Helper to extract text from output parts (kickoff/resume prompts go here)
+function extractOutputText(output: {
+  parts: Array<{ type: string; text?: string }>;
+}): string {
+  const textPart = output.parts.find((part) => part.type === 'text');
+  return textPart?.text ?? '';
+}
+
 function requireInterviewId(value: string | null): string {
   expect(value).not.toBeNull();
   return value as string;
+}
+
+function createInterviewService(
+  ctx: ReturnType<typeof createMockContext>,
+  config?: Parameters<typeof createRealInterviewService>[1],
+) {
+  return createRealInterviewService(ctx, config, {
+    openBrowser: mock((_url: string) => {}),
+  });
+}
+
+function createTestService(
+  ctx: ReturnType<typeof createMockContext>,
+  config?: Parameters<typeof createRealInterviewService>[1],
+) {
+  const openBrowserMock = mock((_url: string) => {});
+  const service = createRealInterviewService(ctx, config, {
+    openBrowser: openBrowserMock,
+  });
+
+  return {
+    service,
+    openBrowserMock,
+  };
 }
 
 describe('interview service', () => {
@@ -100,7 +132,7 @@ describe('interview service', () => {
       await fs.rm(tempDir, { recursive: true, force: true });
     });
 
-    test('creates markdown file with correct structure', async () => {
+    test('creates markdown file with slug-only filename (no timestamp prefix)', async () => {
       const tempDir = await fs.mkdtemp('/tmp/interview-test-');
       const ctx = createMockContext({ directory: tempDir });
 
@@ -121,7 +153,9 @@ describe('interview service', () => {
       const interviewDir = path.join(tempDir, 'interview');
       const files = await fs.readdir(interviewDir);
       expect(files.length).toBe(1);
-      expect(files[0]).toMatch(/\d+-test-idea\.md$/);
+      // Filename should be slug-only, no timestamp prefix
+      expect(files[0]).toBe('test-idea.md');
+      expect(files[0]).not.toMatch(/^\d+-/);
 
       // Check file content structure
       const content = await fs.readFile(
@@ -484,6 +518,668 @@ describe('interview service', () => {
       const stateAfter = await service.getInterviewState(requiredInterviewId);
       expect(stateAfter.mode).toBe('awaiting-agent');
       expect(stateAfter.isBusy).toBe(true);
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('configurable output folder', () => {
+    test('creates interview in configured output folder', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Create service with custom output folder config
+      const service = createInterviewService(ctx, {
+        maxQuestions: 2,
+        outputFolder: 'custom-interviews',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-custom-folder',
+          arguments: 'Custom Folder Idea',
+        },
+        output,
+      );
+
+      // Check that file was created in custom folder
+      const customDir = path.join(tempDir, 'custom-interviews');
+      const files = await fs.readdir(customDir);
+      expect(files.length).toBe(1);
+      expect(files[0]).toBe('custom-folder-idea.md');
+
+      // Verify the markdownPath in state points to custom folder
+      const interviewId = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+      const requiredInterviewId = requireInterviewId(interviewId);
+      const state = await service.getInterviewState(requiredInterviewId);
+      expect(state.markdownPath).toContain('custom-interviews');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('handles nested output folder paths', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Create service with nested output folder path
+      const service = createInterviewService(ctx, {
+        maxQuestions: 2,
+        outputFolder: 'docs/interviews',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-nested',
+          arguments: 'Nested Path Idea',
+        },
+        output,
+      );
+
+      // Check that file was created in nested folder
+      const nestedDir = path.join(tempDir, 'docs', 'interviews');
+      const files = await fs.readdir(nestedDir);
+      expect(files.length).toBe(1);
+      expect(files[0]).toBe('nested-path-idea.md');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('resuming with existing markdown file', () => {
+    test('resumes existing file and sends resume prompt instead of kickoff', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Pre-create an existing interview file
+      const interviewDir = path.join(tempDir, 'interview');
+      await fs.mkdir(interviewDir, { recursive: true });
+      const existingFilePath = path.join(interviewDir, 'existing-idea.md');
+      await fs.writeFile(
+        existingFilePath,
+        '# Existing Idea\n\n## Current spec\n\nExisting spec content.\n\n## Q&A history\n\nQ: What platform?\nA: Web\n',
+        'utf8',
+      );
+
+      const service = createInterviewService(ctx);
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      // Resume by referencing the existing file basename
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-resume',
+          arguments: 'existing-idea',
+        },
+        output,
+      );
+
+      // Should send resume prompt (references existing document)
+      const outputText = extractOutputText(output);
+      expect(outputText).toContain('Resume the interview');
+      expect(outputText).toContain('Existing Idea');
+      expect(outputText).toContain('Existing spec content');
+
+      // Should NOT send kickoff prompt
+      expect(outputText).not.toContain(
+        'You are running an interview q&a session',
+      );
+      expect(outputText).not.toContain('Initial idea:');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('resumes by full relative path to existing file', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Pre-create an existing interview file in custom location
+      const customDir = path.join(tempDir, 'docs');
+      await fs.mkdir(customDir, { recursive: true });
+      const existingFilePath = path.join(customDir, 'my-project.md');
+      await fs.writeFile(
+        existingFilePath,
+        '# My Project\n\n## Current spec\n\nProject spec here.\n\n## Q&A history\n\nNo answers yet.\n',
+        'utf8',
+      );
+
+      const service = createInterviewService(ctx);
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      // Resume by referencing the relative path
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-resume-path',
+          arguments: 'docs/my-project.md',
+        },
+        output,
+      );
+
+      // Should send resume prompt
+      const outputText = extractOutputText(output);
+      expect(outputText).toContain('Resume the interview');
+      expect(outputText).toContain('My Project');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('reuses same file when resuming multiple times', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Pre-create an existing interview file
+      const interviewDir = path.join(tempDir, 'interview');
+      await fs.mkdir(interviewDir, { recursive: true });
+      const existingFilePath = path.join(interviewDir, 'reusable.md');
+      await fs.writeFile(
+        existingFilePath,
+        '# Reusable Interview\n\n## Current spec\n\nOriginal content.\n\n## Q&A history\n\n',
+        'utf8',
+      );
+
+      const service = createInterviewService(ctx);
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+
+      // First resume
+      const output1 = { parts: [] as Array<{ type: string; text?: string }> };
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-reuse-1',
+          arguments: 'reusable',
+        },
+        output1,
+      );
+
+      const interviewId1 = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+
+      // Second resume (different session, same file)
+      const output2 = { parts: [] as Array<{ type: string; text?: string }> };
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-reuse-2',
+          arguments: 'reusable',
+        },
+        output2,
+      );
+
+      const interviewId2 = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+
+      // Both should reference the same file
+      const state1 = await service.getInterviewState(
+        requireInterviewId(interviewId1),
+      );
+      const state2 = await service.getInterviewState(
+        requireInterviewId(interviewId2),
+      );
+      expect(state1.markdownPath).toBe(state2.markdownPath);
+      expect(state1.markdownPath).toContain('reusable.md');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('configurable maxQuestions', () => {
+    test('kickoff prompt references configured maxQuestions count', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Create service with custom maxQuestions
+      const service = createInterviewService(ctx, {
+        maxQuestions: 5,
+        outputFolder: 'interview',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-max-q',
+          arguments: 'Max Questions Test',
+        },
+        output,
+      );
+
+      // Kickoff prompt should reference the configured maxQuestions
+      const outputText = extractOutputText(output);
+      expect(outputText).toContain('at most 5 questions');
+      expect(outputText).toContain('Return 0 to 5 questions');
+      expect(outputText).toContain('Do not ask more than 5 questions');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('resume prompt references configured maxQuestions count', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      // Pre-create an existing file to trigger resume
+      const interviewDir = path.join(tempDir, 'interview');
+      await fs.mkdir(interviewDir, { recursive: true });
+      await fs.writeFile(
+        path.join(interviewDir, 'resume-max.md'),
+        '# Resume Max\n\n## Current spec\n\nSpec.\n\n## Q&A history\n\n',
+        'utf8',
+      );
+
+      // Create service with custom maxQuestions
+      const service = createInterviewService(ctx, {
+        maxQuestions: 3,
+        outputFolder: 'interview',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-resume-max',
+          arguments: 'resume-max',
+        },
+        output,
+      );
+
+      // Resume prompt should reference the configured maxQuestions
+      const outputText = extractOutputText(output);
+      expect(outputText).toContain('up to 3 at a time');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('state exposes at most configured maxQuestions questions', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+
+      // Start with empty messages
+      const messagesData: Array<{
+        info?: { role: string };
+        parts?: Array<{ type: string; text?: string }>;
+      }> = [];
+
+      const ctx = createMockContext({
+        directory: tempDir,
+        messagesData,
+      });
+
+      // Create service with maxQuestions = 2
+      const service = createInterviewService(ctx, {
+        maxQuestions: 2,
+        outputFolder: 'interview',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      // Create interview first (baseMessageCount = 0)
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-parse-max',
+          arguments: 'Parse Max Test',
+        },
+        output,
+      );
+
+      const interviewId = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+      const requiredInterviewId = requireInterviewId(interviewId);
+
+      // Now add the agent response with more questions than maxQuestions
+      messagesData.push({
+        info: { role: 'assistant' },
+        parts: [
+          {
+            type: 'text',
+            text: 'Questions.\n<interview_state>\n{\n  "summary": "Test",\n  "questions": [\n    {"id": "q-1", "question": "Q1?", "options": ["A", "B"]},\n    {"id": "q-2", "question": "Q2?", "options": ["A", "B"]},\n    {"id": "q-3", "question": "Q3?", "options": ["A", "B"]},\n    {"id": "q-4", "question": "Q4?", "options": ["A", "B"]}\n  ]\n}\n</interview_state>',
+          },
+        ],
+      });
+
+      // State should only expose at most maxQuestions questions
+      const state = await service.getInterviewState(requiredInterviewId);
+      expect(state.questions.length).toBeLessThanOrEqual(2);
+      expect(state.questions.length).toBe(2);
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('answer prompt references configured maxQuestions count', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+
+      // Start with empty messages
+      const messagesData: Array<{
+        info?: { role: string };
+        parts?: Array<{ type: string; text?: string }>;
+      }> = [];
+
+      const ctx = createMockContext({
+        directory: tempDir,
+        messagesData,
+      });
+
+      // Create service with custom maxQuestions
+      const service = createInterviewService(ctx, {
+        maxQuestions: 4,
+        outputFolder: 'interview',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+
+      // Create interview first (baseMessageCount = 0)
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-answer-max',
+          arguments: 'Answer Max Test',
+        },
+        output,
+      );
+
+      const interviewId = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+      const requiredInterviewId = requireInterviewId(interviewId);
+
+      // Now add the agent response with a question
+      messagesData.push({
+        info: { role: 'assistant' },
+        parts: [
+          {
+            type: 'text',
+            text: 'Question.\n<interview_state>\n{\n  "summary": "Test",\n  "questions": [{"id": "q-1", "question": "What?", "options": ["A", "B"]}]\n}\n</interview_state>',
+          },
+        ],
+      });
+
+      // Clear previous prompt calls to capture the answer prompt
+      ctx.client.session.prompt.mock.calls.length = 0;
+
+      // Submit an answer
+      const answers: InterviewAnswer[] = [{ questionId: 'q-1', answer: 'A' }];
+      await service.submitAnswers(requiredInterviewId, answers);
+
+      // Answer prompt should reference the configured maxQuestions
+      const lastPromptText = getPromptTexts(ctx.client.session.prompt).join(
+        '\n',
+      );
+      expect(lastPromptText).toContain('Return 0 to 4 questions');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('agent-provided title', () => {
+    test('renames file when assistant provides title in interview_state', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+
+      // Start with empty messages
+      const messagesData: Array<{
+        info?: { role: string };
+        parts?: Array<{ type: string; text?: string }>;
+      }> = [];
+
+      const ctx = createMockContext({
+        directory: tempDir,
+        messagesData,
+      });
+
+      const service = createInterviewService(ctx);
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      // Create interview with user's idea
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-title-test',
+          arguments: 'My Great App Idea With Long Description',
+        },
+        output,
+      );
+
+      // Initial file should use slugified user input
+      const interviewDir = path.join(tempDir, 'interview');
+      let files = await fs.readdir(interviewDir);
+      expect(files.length).toBe(1);
+      expect(files[0]).toBe('my-great-app-idea-with-long-description.md');
+
+      const interviewId = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+      const requiredInterviewId = requireInterviewId(interviewId);
+
+      // Now add agent response with a concise title
+      messagesData.push({
+        info: { role: 'assistant' },
+        parts: [
+          {
+            type: 'text',
+            text: 'Here are some questions.\n<interview_state>\n{\n  "summary": "Building a task management app",\n  "title": "task-manager",\n  "questions": [{"id": "q-1", "question": "What platform?", "options": ["Web", "Mobile"]}]\n}\n</interview_state>',
+          },
+        ],
+      });
+
+      // Sync interview (this triggers the rename)
+      const state = await service.getInterviewState(requiredInterviewId);
+
+      // File should be renamed to use assistant-provided title
+      files = await fs.readdir(interviewDir);
+      expect(files.length).toBe(1);
+      expect(files[0]).toBe('task-manager.md');
+      expect(state.markdownPath).toContain('task-manager.md');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('keeps original filename when assistant omits title', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+
+      const messagesData: Array<{
+        info?: { role: string };
+        parts?: Array<{ type: string; text?: string }>;
+      }> = [];
+
+      const ctx = createMockContext({
+        directory: tempDir,
+        messagesData,
+      });
+
+      const service = createInterviewService(ctx);
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-no-title',
+          arguments: 'Simple Idea',
+        },
+        output,
+      );
+
+      const interviewDir = path.join(tempDir, 'interview');
+      let files = await fs.readdir(interviewDir);
+      expect(files[0]).toBe('simple-idea.md');
+
+      const interviewId = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+      const requiredInterviewId = requireInterviewId(interviewId);
+
+      // Agent response without title field
+      messagesData.push({
+        info: { role: 'assistant' },
+        parts: [
+          {
+            type: 'text',
+            text: 'Questions.\n<interview_state>\n{\n  "summary": "Building an app",\n  "questions": [{"id": "q-1", "question": "What?", "options": ["A", "B"]}]\n}\n</interview_state>',
+          },
+        ],
+      });
+
+      const state = await service.getInterviewState(requiredInterviewId);
+
+      // Filename should remain unchanged
+      files = await fs.readdir(interviewDir);
+      expect(files[0]).toBe('simple-idea.md');
+      expect(state.markdownPath).toContain('simple-idea.md');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('does not rename if target filename already exists', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+
+      const messagesData: Array<{
+        info?: { role: string };
+        parts?: Array<{ type: string; text?: string }>;
+      }> = [];
+
+      const ctx = createMockContext({
+        directory: tempDir,
+        messagesData,
+      });
+
+      // Pre-create a file with the target name
+      const interviewDir = path.join(tempDir, 'interview');
+      await fs.mkdir(interviewDir, { recursive: true });
+      await fs.writeFile(
+        path.join(interviewDir, 'target-name.md'),
+        '# Existing\n\n## Current spec\n\nExisting.\n\n## Q&A history\n\n',
+        'utf8',
+      );
+
+      const service = createInterviewService(ctx);
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-existing',
+          arguments: 'Original Idea',
+        },
+        output,
+      );
+
+      let files = await fs.readdir(interviewDir);
+      expect(files).toContain('original-idea.md');
+      expect(files).toContain('target-name.md');
+
+      const interviewId = extractInterviewIdFromLastPrompt(
+        ctx.client.session.prompt,
+      );
+      const requiredInterviewId = requireInterviewId(interviewId);
+
+      // Agent suggests a title that matches existing file
+      messagesData.push({
+        info: { role: 'assistant' },
+        parts: [
+          {
+            type: 'text',
+            text: 'Questions.\n<interview_state>\n{\n  "summary": "Building an app",\n  "title": "target-name",\n  "questions": [{"id": "q-1", "question": "What?", "options": ["A", "B"]}]\n}\n</interview_state>',
+          },
+        ],
+      });
+
+      const state = await service.getInterviewState(requiredInterviewId);
+
+      // Should not rename (would overwrite existing file)
+      files = await fs.readdir(interviewDir);
+      expect(files).toContain('original-idea.md');
+      expect(files).toContain('target-name.md');
+      expect(state.markdownPath).toContain('original-idea.md');
+
+      // Cleanup
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('autoOpenBrowser config', () => {
+    test('uses injected browser opener instead of opening a real browser in tests', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      const { service, openBrowserMock } = createTestService(ctx, {
+        maxQuestions: 2,
+        outputFolder: 'interview',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-browser-open',
+          arguments: 'Browser Open Test',
+        },
+        output,
+      );
+
+      expect(openBrowserMock).toHaveBeenCalledTimes(1);
+
+      await fs.rm(tempDir, { recursive: true, force: true });
+    });
+
+    test('kickoff prompt includes title field guidance', async () => {
+      const tempDir = await fs.mkdtemp('/tmp/interview-test-');
+      const ctx = createMockContext({ directory: tempDir });
+
+      const service = createInterviewService(ctx, {
+        maxQuestions: 2,
+        outputFolder: 'interview',
+        autoOpenBrowser: true,
+      });
+      service.setBaseUrlResolver(async () => 'http://localhost:9999');
+      const output = { parts: [] as Array<{ type: string; text?: string }> };
+
+      await service.handleCommandExecuteBefore(
+        {
+          command: 'interview',
+          sessionID: 'session-browser-config',
+          arguments: 'Browser Config Test',
+        },
+        output,
+      );
+
+      // Kickoff prompt should mention title field
+      const outputText = extractOutputText(output);
+      expect(outputText).toContain('"title":');
+      expect(outputText).toContain('concise-kebab-case-title-for-filename');
 
       // Cleanup
       await fs.rm(tempDir, { recursive: true, force: true });

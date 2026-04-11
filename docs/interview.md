@@ -22,7 +22,8 @@ From there you can:
 - use suggested/default answers to move faster
 - use keyboard shortcuts for quick selection
 - submit answers back into the same session
-- keep a markdown document updated in `interview/*.md`
+- keep a markdown document updated in `interview/*.md` by default
+- have the file automatically renamed based on the assistant's concise title
 
 ---
 
@@ -60,7 +61,7 @@ Example:
 /interview build a kanban app for design teams
 ```
 
-OpenCode will post a local URL in the session.
+OpenCode will post a local URL in the session and automatically open your default browser (if enabled).
 
 ---
 
@@ -70,7 +71,7 @@ You will see a localhost link like this:
 
 ![Interview URL](../img/interview-url.png)
 
-Open it in your browser.
+The browser should open automatically. If it doesn't, click the link.
 
 ---
 
@@ -98,6 +99,7 @@ The agent then:
 - updates its understanding
 - asks the next highest-value questions
 - refreshes the markdown spec in your repo
+- suggests a concise filename (e.g., `kanban-design-tool.md`)
 
 ---
 
@@ -112,7 +114,7 @@ interview/
 Example:
 
 ```text
-interview/1775844895562-kanban-app-for-design-teams.md
+interview/kanban-design-tool.md
 ```
 
 The file looks like this:
@@ -141,6 +143,41 @@ Notes:
 - `Current spec` is refreshed as the interview evolves
 - `Q&A history` is append-only
 - answer options are **not** written into the markdown history
+- the filename is based on the assistant's `title` field (kebab-case, concise)
+- if the assistant omits the title, the filename uses a slugified version of your original input
+
+You can also configure:
+
+- the maximum number of questions returned in each round
+- the output folder for interview markdown files
+- whether to automatically open the browser
+
+And if you run `/interview` with an existing markdown path or basename, the interview resumes from that file instead of starting a new one.
+
+---
+
+## Configuration
+
+Add interview settings to your OpenCode config:
+
+```jsonc
+{
+  "plugin": ["oh-my-opencode-slim"],
+  "oh-my-opencode-slim": {
+    "interview": {
+      "maxQuestions": 2,          // Questions per round (1-10, default: 2)
+      "outputFolder": "interview", // Where to save markdown files
+      "autoOpenBrowser": true      // Auto-open browser on start (default: true)
+    }
+  }
+}
+```
+
+### autoOpenBrowser
+
+When enabled (default), the plugin automatically opens your default browser to the interview URL when you start a new interview. This works on macOS (`open`), Linux (`xdg-open`), and Windows (`start`). If opening fails, the error is logged but the interview continues normally.
+
+The browser only opens once per interview (on initial creation/resume), not on every status update or poll.
 
 ---
 
@@ -179,6 +216,7 @@ Normal chat is flexible, but interviews are usually faster in a focused UI.
 - structured answer selection
 - less noisy back-and-forth
 - a repo-local markdown artifact from the start
+- automatic, meaningful filenames based on the assistant's understanding
 
 It is not a replacement for chat — it is a better input mode for specification work.
 
@@ -197,10 +235,10 @@ It is not a replacement for chat — it is a better input mode for specification
 
 Use `/interview` when you want to say things like:
 
-- “Help me define this feature before building it.”
-- “Turn this rough idea into a clearer spec.”
-- “Ask me the right product questions one step at a time.”
-- “Write the evolving spec into the repo while we refine it.”
+- "Help me define this feature before building it."
+- "Turn this rough idea into a clearer spec."
+- "Ask me the right product questions one step at a time."
+- "Write the evolving spec into the repo while we refine it."
 
 ---
 

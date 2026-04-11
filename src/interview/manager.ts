@@ -1,4 +1,5 @@
 import type { PluginInput } from '@opencode-ai/plugin';
+import type { PluginConfig } from '../config';
 import { createInterviewServer } from './server';
 import { createInterviewService } from './service';
 
@@ -20,7 +21,10 @@ import { createInterviewService } from './service';
  * - handleCommandExecuteBefore: intercepts /interview execution
  * - handleEvent: listens to session.status and session.deleted events
  */
-export function createInterviewManager(ctx: PluginInput): {
+export function createInterviewManager(
+  ctx: PluginInput,
+  config: PluginConfig,
+): {
   registerCommand: (config: Record<string, unknown>) => void;
   handleCommandExecuteBefore: (
     input: { command: string; sessionID: string; arguments: string },
@@ -30,7 +34,7 @@ export function createInterviewManager(ctx: PluginInput): {
     event: { type: string; properties?: Record<string, unknown> };
   }) => Promise<void>;
 } {
-  const service = createInterviewService(ctx);
+  const service = createInterviewService(ctx, config.interview);
   const server = createInterviewServer({
     getState: async (interviewId) => service.getInterviewState(interviewId),
     submitAnswers: async (interviewId, answers) =>
