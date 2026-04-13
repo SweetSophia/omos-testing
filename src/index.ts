@@ -465,6 +465,17 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
           };
         },
       );
+
+      if (input.event.type === 'session.deleted') {
+        const props = input.event.properties as
+          | { info?: { id?: string }; sessionID?: string }
+          | undefined;
+        const sessionID =
+          props?.info?.id ?? props?.sessionID;
+        if (sessionID) {
+          sessionAgentMap.delete(sessionID);
+        }
+      }
     },
 
     // Best-effort rescue only for stale apply_patch input before native execution
@@ -541,6 +552,8 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
             (output.system[0] ? `\n\n${output.system[0]}` : '');
         }
       }
+
+      await todoContinuationHook.handleChatSystemTransform(input, output);
       await postFileToolNudgeHook['experimental.chat.system.transform'](
         input,
         output,
@@ -590,6 +603,13 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
           title: string;
           output: unknown;
           metadata: unknown;
+        },
+      );
+
+      await todoContinuationHook.handleToolExecuteAfter(
+        input as {
+          tool: string;
+          sessionID?: string;
         },
       );
 

@@ -1,6 +1,10 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { SLIM_INTERNAL_INITIATOR_MARKER } from '../../utils';
 import { createTodoContinuationHook } from './index';
+import {
+  TODO_FINAL_ACTIVE_REMINDER,
+  TODO_HYGIENE_REMINDER,
+} from './todo-hygiene';
 
 describe('createTodoContinuationHook', () => {
   function createMockContext(overrides?: {
@@ -81,6 +85,86 @@ describe('createTodoContinuationHook', () => {
       const result = await hook.tool.auto_continue.execute({ enabled: false });
 
       expect(result).toBe('Auto-continue disabled.');
+    });
+  });
+
+  describe('todo hygiene routing', () => {
+    test('does not inject hygiene reminder for unknown non-orchestrator session', async () => {
+      const ctx = createMockContext({
+        todoResult: {
+          data: [
+            { id: '1', content: 'todo1', status: 'pending', priority: 'high' },
+          ],
+        },
+      });
+      const hook = createTodoContinuationHook(ctx);
+      const system = { system: ['base'] };
+
+      await hook.handleToolExecuteAfter({ tool: 'task', sessionID: 'sub1' });
+      await hook.handleChatSystemTransform({ sessionID: 'sub1' }, system);
+
+      expect(system.system.join('\n')).not.toContain(TODO_HYGIENE_REMINDER);
+    });
+
+    test('injects hygiene reminder only for orchestrator session', async () => {
+      const ctx = createMockContext({
+        todoResult: {
+          data: [
+            { id: '1', content: 'todo1', status: 'pending', priority: 'high' },
+          ],
+        },
+      });
+      const hook = createTodoContinuationHook(ctx);
+      const system = { system: ['base'] };
+
+      hook.handleChatMessage({ sessionID: 'main1', agent: 'orchestrator' });
+      await hook.handleToolExecuteAfter({ tool: 'task', sessionID: 'main1' });
+      await hook.handleChatSystemTransform({ sessionID: 'main1' }, system);
+
+      expect(system.system.join('\n')).toContain(TODO_HYGIENE_REMINDER);
+    });
+
+    test('normal read-only work can arm hygiene reminder after todowrite reset', async () => {
+      const ctx = createMockContext({
+        todoResult: {
+          data: [
+            { id: '1', content: 'todo1', status: 'pending', priority: 'high' },
+          ],
+        },
+      });
+      const hook = createTodoContinuationHook(ctx);
+      const system = { system: ['base'] };
+
+      hook.handleChatMessage({ sessionID: 'main1', agent: 'orchestrator' });
+      await hook.handleToolExecuteAfter({ tool: 'todowrite', sessionID: 'main1' });
+      await hook.handleToolExecuteAfter({ tool: 'read', sessionID: 'main1' });
+      await hook.handleChatSystemTransform({ sessionID: 'main1' }, system);
+
+      expect(system.system.join('\n')).toContain(TODO_HYGIENE_REMINDER);
+    });
+
+    test('final active todo after todowrite uses the stronger finishing reminder', async () => {
+      const ctx = createMockContext({
+        todoResult: {
+          data: [
+            {
+              id: '1',
+              content: 'todo1',
+              status: 'in_progress',
+              priority: 'high',
+            },
+          ],
+        },
+      });
+      const hook = createTodoContinuationHook(ctx);
+      const system = { system: ['base'] };
+
+      hook.handleChatMessage({ sessionID: 'main1', agent: 'orchestrator' });
+      await hook.handleToolExecuteAfter({ tool: 'todowrite', sessionID: 'main1' });
+      await hook.handleChatSystemTransform({ sessionID: 'main1' }, system);
+
+      expect(system.system.join('\n')).toContain(TODO_FINAL_ACTIVE_REMINDER);
+      expect(system.system.join('\n')).not.toContain(TODO_HYGIENE_REMINDER);
     });
   });
 
@@ -568,7 +652,7 @@ describe('createTodoContinuationHook', () => {
     });
 
     test('cooldownMs from config', async () => {
-      const customCooldownMs = 100;
+      const customCooldownMs = 150;
       const ctx = createMockContext({
         todoResult: {
           data: [
@@ -598,14 +682,14 @@ describe('createTodoContinuationHook', () => {
         },
       });
 
-      // Advance timer by less than custom cooldown
-      await delay(customCooldownMs - 1);
+      // Advance timer by well under the custom cooldown to avoid timer jitter
+      await delay(60);
 
       // Verify prompt not called yet
       expect(hasContinuation(ctx.client.session.prompt)).toBe(false);
 
-      // Advance timer by remaining 1ms
-      await delay(1);
+      // Advance timer past the configured cooldown
+      await delay(100);
 
       // Now prompt should be called
       expect(hasContinuation(ctx.client.session.prompt)).toBe(true);

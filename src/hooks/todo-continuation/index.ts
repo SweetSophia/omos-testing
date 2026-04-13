@@ -1,6 +1,7 @@
 import type { PluginInput } from '@opencode-ai/plugin';
 import { tool } from '@opencode-ai/plugin/tool';
 import { createInternalAgentTextPart, log } from '../../utils';
+import { createTodoHygiene } from './todo-hygiene';
 
 const HOOK_NAME = 'todo-continuation';
 const COMMAND_NAME = 'auto-continue';
@@ -107,6 +108,14 @@ export function createTodoContinuationHook(
   },
 ): {
   tool: Record<string, unknown>;
+  handleToolExecuteAfter: (input: {
+    tool: string;
+    sessionID?: string;
+  }) => Promise<void>;
+  handleChatSystemTransform: (
+    input: { sessionID?: string },
+    output: { system: string[] },
+  ) => Promise<void>;
   handleEvent: (input: {
     event: { type: string; properties?: Record<string, unknown> };
   }) => Promise<void>;
@@ -137,6 +146,28 @@ export function createTodoContinuationHook(
     notifyingSessionIds: new Set<string>(),
     notificationBusyUntilBySession: new Map<string, number>(),
   };
+
+  const hygiene = createTodoHygiene({
+    getTodoState: async (sessionID) => {
+      const result = await ctx.client.session.todo({
+        path: { id: sessionID },
+      });
+      const todos = result.data as TodoItem[];
+      const openTodos = todos.filter(
+        (todo) => !TERMINAL_TODO_STATUSES.includes(todo.status),
+      );
+      return {
+        hasOpenTodos: openTodos.length > 0,
+        inProgressCount: openTodos.filter(
+          (todo) => todo.status === 'in_progress',
+        ).length,
+        pendingCount: openTodos.filter((todo) => todo.status === 'pending')
+          .length,
+      };
+    },
+    shouldInject: (sessionID) => isOrchestratorSession(sessionID),
+    log: (message, meta) => log(`[${HOOK_NAME}] ${message}`, meta),
+  });
 
   function markNotificationStarted(sessionID: string): void {
     state.notifyingSessionIds.add(sessionID);
@@ -217,6 +248,14 @@ export function createTodoContinuationHook(
   }): Promise<void> {
     const { event } = input;
     const properties = event.properties ?? {};
+
+    hygiene.handleEvent({
+      type: event.type,
+      properties: {
+        info: properties.info as { id?: string } | undefined,
+        sessionID: properties.sessionID as string | undefined,
+      },
+    });
 
     if (
       event.type === 'session.idle' ||
@@ -619,6 +658,8 @@ export function createTodoContinuationHook(
 
   return {
     tool: { auto_continue: autoContinue },
+    handleToolExecuteAfter: hygiene.handleToolExecuteAfter,
+    handleChatSystemTransform: hygiene.handleChatSystemTransform,
     handleEvent,
     handleChatMessage,
     handleCommandExecuteBefore,
