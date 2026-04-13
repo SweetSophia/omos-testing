@@ -62,14 +62,32 @@ function isPackageManagerInstall(path: string): boolean {
   return normalizedPath.includes(`/node_modules/${PACKAGE_NAME}`);
 }
 
-function isPluginEntry(entry: string): boolean {
-  const normalizedEntry = normalizePathForMatch(entry);
+function isLocalPackageRootEntry(entry: string): boolean {
+  if (!entry || entry.startsWith('file://')) {
+    return false;
+  }
 
+  const packageJsonPath = join(entry, 'package.json');
+  if (!existsSync(packageJsonPath)) {
+    return false;
+  }
+
+  try {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+      name?: string;
+    };
+    return packageJson.name === PACKAGE_NAME;
+  } catch {
+    return false;
+  }
+}
+
+function isPluginEntry(entry: string): boolean {
   return (
     entry === PACKAGE_NAME ||
     entry.startsWith(`${PACKAGE_NAME}@`) ||
-    normalizedEntry.endsWith(`/${PACKAGE_NAME}`) ||
-    normalizedEntry.includes(`/${PACKAGE_NAME}/`)
+    (entry.startsWith('file://') && entry.includes(PACKAGE_NAME)) ||
+    isLocalPackageRootEntry(entry)
   );
 }
 

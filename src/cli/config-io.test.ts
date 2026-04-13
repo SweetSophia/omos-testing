@@ -184,6 +184,25 @@ describe('config-io', () => {
     expect(saved.plugin).toEqual([packageRoot]);
   });
 
+  test('addPluginToOpenCodeConfig deduplicates existing local repo path entries', async () => {
+    const configPath = join(tmpDir, 'opencode', 'opencode.json');
+    const packageRoot = join(tmpDir, 'repo');
+    const localCliPath = join(packageRoot, 'dist', 'cli', 'index.js');
+    paths.ensureConfigDir();
+    writePackageJson(packageRoot);
+    writeFileSync(
+      configPath,
+      JSON.stringify({ plugin: ['other', packageRoot] }),
+    );
+    process.argv[1] = localCliPath;
+
+    const result = await addPluginToOpenCodeConfig();
+
+    expect(result.success).toBe(true);
+    const saved = JSON.parse(readFileSync(configPath, 'utf-8'));
+    expect(saved.plugin).toEqual(['other', packageRoot]);
+  });
+
   test('writeLiteConfig writes lite config with OpenAI preset', () => {
     const litePath = join(tmpDir, 'opencode', 'oh-my-opencode-slim.json');
     paths.ensureConfigDir();
@@ -255,5 +274,17 @@ describe('config-io', () => {
     expect(detected.hasCopilot).toBe(true);
     expect(detected.hasZaiPlan).toBe(true);
     expect(detected.hasTmux).toBe(true);
+  });
+
+  test('detectCurrentConfig treats local repo path entries as installed', () => {
+    const configPath = join(tmpDir, 'opencode', 'opencode.json');
+    const packageRoot = join(tmpDir, 'repo');
+    paths.ensureConfigDir();
+    writePackageJson(packageRoot);
+    writeFileSync(configPath, JSON.stringify({ plugin: [packageRoot] }));
+
+    const detected = detectCurrentConfig();
+
+    expect(detected.isInstalled).toBe(true);
   });
 });
