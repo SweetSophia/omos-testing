@@ -6,7 +6,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   ensureConfigDir,
   ensureOpenCodeConfigDir,
@@ -23,11 +23,53 @@ import type {
 
 const PACKAGE_NAME = 'oh-my-opencode-slim';
 
+function normalizePathForMatch(path: string): string {
+  return path.replaceAll('\\', '/');
+}
+
+function findPackageRoot(startPath: string): string | null {
+  let currentPath = dirname(startPath);
+
+  while (true) {
+    const packageJsonPath = join(currentPath, 'package.json');
+
+    if (existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(
+          readFileSync(packageJsonPath, 'utf-8'),
+        ) as {
+          name?: string;
+        };
+
+        if (packageJson.name === PACKAGE_NAME) {
+          return currentPath;
+        }
+      } catch {
+        // Ignore invalid package.json while walking upward.
+      }
+    }
+
+    const parentPath = dirname(currentPath);
+    if (parentPath === currentPath) {
+      return null;
+    }
+    currentPath = parentPath;
+  }
+}
+
+function isPackageManagerInstall(path: string): boolean {
+  const normalizedPath = normalizePathForMatch(path);
+  return normalizedPath.includes(`/node_modules/${PACKAGE_NAME}`);
+}
+
 function isPluginEntry(entry: string): boolean {
+  const normalizedEntry = normalizePathForMatch(entry);
+
   return (
     entry === PACKAGE_NAME ||
     entry.startsWith(`${PACKAGE_NAME}@`) ||
-    (entry.startsWith('file://') && entry.includes(PACKAGE_NAME))
+    normalizedEntry.endsWith(`/${PACKAGE_NAME}`) ||
+    normalizedEntry.includes(`/${PACKAGE_NAME}/`)
   );
 }
 
@@ -39,20 +81,13 @@ function getPluginEntry(): string {
   }
 
   try {
-    const pluginEntryPath = cliEntryPath.match(
-      /[\\/]dist[\\/]cli[\\/]index\.js$/,
-    )
-      ? cliEntryPath.replace(
-          /[\\/]dist[\\/]cli[\\/]index\.js$/,
-          '/dist/index.js',
-        )
-      : null;
+    const packageRoot = findPackageRoot(cliEntryPath);
 
-    if (!pluginEntryPath) {
+    if (!packageRoot || isPackageManagerInstall(packageRoot)) {
       return PACKAGE_NAME;
     }
 
-    return pathToFileURL(pluginEntryPath).href;
+    return packageRoot;
   } catch {
     return PACKAGE_NAME;
   }
