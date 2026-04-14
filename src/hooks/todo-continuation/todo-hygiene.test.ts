@@ -155,6 +155,27 @@ describe('todo hygiene', () => {
     expect(system.system.join('\n')).toContain(TODO_FINAL_ACTIVE_REMINDER);
   });
 
+  test('once final-active is armed, later tools skip extra todo lookups in the same round', async () => {
+    let calls = 0;
+    const hook = createTodoHygiene({
+      getTodoState: async () => {
+        calls++;
+        return createState({
+          openCount: 1,
+          inProgressCount: 1,
+          pendingCount: 0,
+        });
+      },
+    });
+
+    hook.handleRequestStart({ sessionID: 's1' });
+    await hook.handleToolExecuteAfter({ tool: 'todowrite', sessionID: 's1' });
+    await hook.handleToolExecuteAfter({ tool: 'read', sessionID: 's1' });
+    await hook.handleToolExecuteAfter({ tool: 'grep', sessionID: 's1' });
+
+    expect(calls).toBe(1);
+  });
+
   test('shouldInject rejection consumes the pending reminder', async () => {
     const hook = createTodoHygiene({
       getTodoState: async () => createState(),

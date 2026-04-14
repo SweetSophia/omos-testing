@@ -190,7 +190,7 @@ export function createTodoContinuationHook(
       return direct;
     }
 
-    for (let i = index; i >= 0; i--) {
+    for (let i = index - 1; i >= 0; i--) {
       const sessionID = messages[i]?.info.sessionID;
       if (sessionID) {
         return sessionID;
@@ -211,6 +211,35 @@ export function createTodoContinuationHook(
     return undefined;
   }
 
+  function isExternalUserMessage(message: ChatTransformMessage): boolean {
+    if (message.info.role !== 'user') {
+      return false;
+    }
+
+    const visibleText = message.parts
+      .filter(
+        (part) =>
+          part.type === 'text' &&
+          typeof part.text === 'string' &&
+          !part.text.includes(SLIM_INTERNAL_INITIATOR_MARKER),
+      )
+      .map((part) => part.text?.trim() ?? '')
+      .filter(Boolean)
+      .join('\n');
+    const hasNonTextPart = message.parts.some((part) => part.type !== 'text');
+
+    return !(
+      !visibleText &&
+      !hasNonTextPart &&
+      message.parts.some(
+        (part) =>
+          part.type === 'text' &&
+          typeof part.text === 'string' &&
+          part.text.includes(SLIM_INTERNAL_INITIATOR_MARKER),
+      )
+    );
+  }
+
   function getLastExternalUserMessage(messages: ChatTransformMessage[]): {
     sessionID?: string;
     agent?: string;
@@ -218,31 +247,7 @@ export function createTodoContinuationHook(
   } | null {
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i];
-      if (message.info.role !== 'user') {
-        continue;
-      }
-
-      const visibleText = message.parts
-        .filter(
-          (part) =>
-            part.type === 'text' &&
-            typeof part.text === 'string' &&
-            !part.text.includes(SLIM_INTERNAL_INITIATOR_MARKER),
-        )
-        .map((part) => part.text?.trim() ?? '')
-        .filter(Boolean)
-        .join('\n');
-      const hasNonTextPart = message.parts.some((part) => part.type !== 'text');
-      const isInternalOnly =
-        !visibleText &&
-        !hasNonTextPart &&
-        message.parts.some(
-          (part) =>
-            part.type === 'text' &&
-            typeof part.text === 'string' &&
-            part.text.includes(SLIM_INTERNAL_INITIATOR_MARKER),
-        );
-      if (isInternalOnly) {
+      if (!isExternalUserMessage(message)) {
         continue;
       }
 
@@ -256,33 +261,9 @@ export function createTodoContinuationHook(
           return part.type ?? 'unknown';
         })
         .join('|');
-      const ordinal = messages.slice(0, i + 1).filter((item) => {
-        if (item.info.role !== 'user') {
-          return false;
-        }
-
-        const text = item.parts
-          .filter(
-            (part) =>
-              part.type === 'text' &&
-              typeof part.text === 'string' &&
-              !part.text.includes(SLIM_INTERNAL_INITIATOR_MARKER),
-          )
-          .map((part) => part.text?.trim() ?? '')
-          .filter(Boolean)
-          .join('\n');
-        const hasNonText = item.parts.some((part) => part.type !== 'text');
-        const internalOnly =
-          !text &&
-          !hasNonText &&
-          item.parts.some(
-            (part) =>
-              part.type === 'text' &&
-              typeof part.text === 'string' &&
-              part.text.includes(SLIM_INTERNAL_INITIATOR_MARKER),
-          );
-        return !internalOnly;
-      }).length;
+      const ordinal = messages
+        .slice(0, i + 1)
+        .filter((item) => isExternalUserMessage(item)).length;
 
       return {
         sessionID,

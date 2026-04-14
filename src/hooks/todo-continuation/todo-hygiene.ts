@@ -139,6 +139,10 @@ export function createTodoHygiene(options: Options) {
           return;
         }
 
+        if (pending.get(input.sessionID)?.has('final_active')) {
+          return;
+        }
+
         if (options.shouldInject && !options.shouldInject(input.sessionID)) {
           clear(input.sessionID);
           return;
