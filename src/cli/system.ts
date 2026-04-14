@@ -1,4 +1,5 @@
 import { statSync } from 'node:fs';
+import { crossSpawn } from '../utils/compat';
 
 let cachedOpenCodePath: string | null = null;
 
@@ -77,7 +78,7 @@ export async function isOpenCodeInstalled(): Promise<boolean> {
 
   for (const opencodePath of paths) {
     try {
-      const proc = Bun.spawn([opencodePath, '--version'], {
+      const proc = crossSpawn([opencodePath, '--version'], {
         stdout: 'pipe',
         stderr: 'pipe',
       });
@@ -95,7 +96,7 @@ export async function isOpenCodeInstalled(): Promise<boolean> {
 
 export async function isTmuxInstalled(): Promise<boolean> {
   try {
-    const proc = Bun.spawn(['tmux', '-V'], {
+    const proc = crossSpawn(['tmux', '-V'], {
       stdout: 'pipe',
       stderr: 'pipe',
     });
@@ -109,14 +110,14 @@ export async function isTmuxInstalled(): Promise<boolean> {
 export async function getOpenCodeVersion(): Promise<string | null> {
   const opencodePath = resolveOpenCodePath();
   try {
-    const proc = Bun.spawn([opencodePath, '--version'], {
+    const proc = crossSpawn([opencodePath, '--version'], {
       stdout: 'pipe',
       stderr: 'pipe',
     });
-    const output = await new Response(proc.stdout).text();
+    const outputPromise = proc.stdout();
     await proc.exited;
     if (proc.exitCode === 0) {
-      return output.trim();
+      return (await outputPromise).trim();
     }
   } catch {
     // Failed

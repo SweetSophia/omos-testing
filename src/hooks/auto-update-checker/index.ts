@@ -1,4 +1,5 @@
 import type { PluginInput } from '@opencode-ai/plugin';
+import { crossSpawn } from '../../utils/compat';
 import { log } from '../../utils/logger';
 import { invalidatePackage } from './cache';
 import {
@@ -176,7 +177,7 @@ async function runBackgroundUpdateCheck(
  */
 async function runBunInstallSafe(ctx: PluginInput): Promise<boolean> {
   try {
-    const proc = Bun.spawn(['bun', 'install'], {
+    const proc = crossSpawn(['bun', 'install'], {
       cwd: ctx.directory,
       stdout: 'pipe',
       stderr: 'pipe',
