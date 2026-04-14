@@ -16,7 +16,7 @@ const cacheMocks = {
   resolveInstallContext: mock(() => ({ installDir: '/tmp/opencode' })),
 };
 
-const crossSpawnMock = mock((command: string[]) => ({
+const crossSpawnMock = mock((_command: string[]) => ({
   exited: Promise.resolve(0),
   exitCode: 0,
   kill: mock(() => true),
