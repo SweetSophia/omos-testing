@@ -45,9 +45,22 @@ function run(
   return result.stdout.trim();
 }
 
+function parsePackJson(output: string) {
+  const start = output.indexOf('[');
+  const end = output.lastIndexOf(']');
+
+  if (start === -1 || end === -1 || end < start) {
+    fail(`Could not locate npm pack JSON output:\n${output}`);
+  }
+
+  return JSON.parse(output.slice(start, end + 1)) as Array<{
+    filename?: string;
+  }>;
+}
+
 function packArtifact() {
   const output = run('npm', ['pack', '--json', '--ignore-scripts']);
-  const parsed = JSON.parse(output) as Array<{ filename?: string }>;
+  const parsed = parsePackJson(output);
   const tarball = parsed[0]?.filename;
   if (!tarball) fail(`npm pack did not return a tarball filename:\n${output}`);
   return path.join(repoRoot, tarball);

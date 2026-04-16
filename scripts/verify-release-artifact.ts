@@ -53,6 +53,20 @@ function run(command: string, args: string[], options: { cwd?: string } = {}) {
   return result.stdout.trim();
 }
 
+function parsePackJson(output: string) {
+  const start = output.indexOf('[');
+  const end = output.lastIndexOf(']');
+
+  if (start === -1 || end === -1 || end < start) {
+    fail(`Could not locate npm pack JSON output:\n${output}`);
+  }
+
+  return JSON.parse(output.slice(start, end + 1)) as Array<{
+    filename?: string;
+    files?: Array<{ path: string }>;
+  }>;
+}
+
 function walkFiles(dir: string): string[] {
   const entries = readdirSync(dir, { withFileTypes: true });
   return entries.flatMap((entry) => {
@@ -90,10 +104,7 @@ function packArtifact() {
   const output = run('npm', ['pack', '--json', '--ignore-scripts'], {
     cwd: repoRoot,
   });
-  const parsed = JSON.parse(output) as Array<{
-    filename?: string;
-    files?: Array<{ path: string }>;
-  }>;
+  const parsed = parsePackJson(output);
   const tarball = parsed[0]?.filename;
 
   if (!tarball) {
