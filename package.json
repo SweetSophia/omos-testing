@@ -44,6 +44,8 @@
     "contributors:check": "all-contributors check",
     "contributors:generate": "all-contributors generate",
     "generate-schema": "bun run scripts/generate-schema.ts",
+    "verify:release": "bun run scripts/verify-release-artifact.ts",
+    "verify:host-smoke": "bun run scripts/verify-opencode-host-smoke.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "lint": "biome lint .",
