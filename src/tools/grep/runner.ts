@@ -91,26 +91,7 @@ async function resolveCliForExecution(
     throw new AbortWaitError('Search was cancelled before execution started.');
   }
 
-  let abortCleanup: (() => void) | undefined;
-
-  try {
-    return await Promise.race([
-      resolveGrepCliWithAutoInstall({}, signal),
-      new Promise<never>((_, reject) => {
-        const onAbort = () => {
-          reject(
-            new AbortWaitError(
-              'Search was cancelled before execution started.',
-            ),
-          );
-        };
-        signal.addEventListener('abort', onAbort, { once: true });
-        abortCleanup = () => signal.removeEventListener('abort', onAbort);
-      }),
-    ]);
-  } finally {
-    abortCleanup?.();
-  }
+  return resolveGrepCliWithAutoInstall({}, signal);
 }
 
 export const runRipgrep: GrepRunner = async (input, signal) => {

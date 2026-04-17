@@ -159,11 +159,6 @@ export class GrepAggregator {
 
     const fileState = this.getFileState(pathInfo);
 
-    if (this.totalMatches >= this.input.maxResults) {
-      this.limitReached = true;
-      return;
-    }
-
     const before =
       this.input.beforeContext > 0
         ? fileState.beforeBuffer

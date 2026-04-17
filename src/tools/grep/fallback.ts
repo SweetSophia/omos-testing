@@ -37,6 +37,7 @@ import {
 import type {
   GrepContextLine,
   GrepFileMatch,
+  GrepMatch,
   GrepSearchResult,
   NormalizedGrepInput,
 } from './types';
@@ -321,46 +322,36 @@ function toContextLine(record: ParsedContentRecord): GrepContextLine {
   };
 }
 
-function appendContentGroup(
-  files: Map<string, GrepFileMatch>,
-  records: ParsedContentRecord[],
-  input: Pick<NormalizedGrepInput, 'cwd' | 'worktree'>,
+function pushRollingContext(
+  target: GrepContextLine[],
+  line: GrepContextLine,
+  maxItems: number,
 ): void {
-  for (let index = 0; index < records.length; index += 1) {
-    const record = records[index] as ParsedContentRecord;
-    if (!record.isMatch) {
-      continue;
-    }
-
-    const before: GrepContextLine[] = [];
-    const after: GrepContextLine[] = [];
-
-    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-      const entry = records[cursor] as ParsedContentRecord;
-      if (entry.isMatch || entry.filePath !== record.filePath) {
-        break;
-      }
-      before.unshift(toContextLine(entry));
-    }
-
-    for (let cursor = index + 1; cursor < records.length; cursor += 1) {
-      const entry = records[cursor] as ParsedContentRecord;
-      if (entry.isMatch || entry.filePath !== record.filePath) {
-        break;
-      }
-      after.push(toContextLine(entry));
-    }
-
-    const file = ensureFileMatch(files, record.filePath, input);
-    file.matchCount += 1;
-    file.matches.push({
-      lineNumber: record.lineNumber,
-      lineText: record.text,
-      submatches: [],
-      before,
-      after,
-    });
+  if (maxItems <= 0) {
+    return;
   }
+
+  target.push(line);
+  if (target.length > maxItems) {
+    target.splice(0, target.length - maxItems);
+  }
+}
+
+function appendTrailingContext(
+  match: GrepMatch | undefined,
+  line: GrepContextLine,
+  maxItems: number,
+): void {
+  if (!match || maxItems <= 0 || match.after.length >= maxItems) {
+    return;
+  }
+
+  const last = match.after[match.after.length - 1];
+  if (last?.lineNumber === line.lineNumber && last.text === line.text) {
+    return;
+  }
+
+  match.after.push(line);
 }
 
 async function consumeNullPrefixedLinesStream(
@@ -439,25 +430,32 @@ async function consumeContentOutput(
 }> {
   const files = new Map<string, GrepFileMatch>();
   const withContext = input.beforeContext > 0 || input.afterContext > 0;
-  let group: ParsedContentRecord[] = [];
   let skippedLines = 0;
   let visibleMatches = 0;
   let limitReached = false;
+  let beforeBuffer: GrepContextLine[] = [];
+  let lastMatch: GrepMatch | undefined;
+  let lastMatchFilePath: string | undefined;
 
-  const stopForLimit = async () => {
+  const resetGroupState = () => {
+    beforeBuffer = [];
+    lastMatch = undefined;
+    lastMatchFilePath = undefined;
+  };
+
+  const stopForLimit = () => {
     limitReached = true;
     killProcess(proc);
   };
 
   await consumeNullPrefixedLinesStream(stdout, (record) => {
     if (withContext && record === '--') {
-      appendContentGroup(files, group, input);
-      group = [];
-      visibleMatches = countVisibleMatches([...files.values()]);
-      if (visibleMatches >= input.maxResults) {
-        void stopForLimit();
+      if (limitReached) {
+        stopForLimit();
         return false;
       }
+
+      resetGroupState();
       return true;
     }
 
@@ -476,7 +474,67 @@ async function consumeContentOutput(
     }
 
     if (withContext) {
-      group.push(parsed);
+      if (lastMatchFilePath && parsed.filePath !== lastMatchFilePath) {
+        if (limitReached) {
+          stopForLimit();
+          return false;
+        }
+
+        resetGroupState();
+      }
+
+      if (parsed.isMatch) {
+        if (limitReached) {
+          stopForLimit();
+          return false;
+        }
+
+        const file = ensureFileMatch(files, parsed.filePath, input);
+        const match: GrepMatch = {
+          lineNumber: parsed.lineNumber,
+          lineText: parsed.text,
+          submatches: [],
+          before:
+            input.beforeContext > 0
+              ? beforeBuffer.slice(-input.beforeContext)
+              : [],
+          after: [],
+        };
+
+        file.matchCount += 1;
+        file.matches.push(match);
+        visibleMatches += 1;
+        lastMatch = match;
+        lastMatchFilePath = parsed.filePath;
+        beforeBuffer = [];
+
+        if (visibleMatches >= input.maxResults) {
+          limitReached = true;
+          if (input.afterContext <= 0) {
+            stopForLimit();
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      const contextLine = toContextLine(parsed);
+      if (lastMatch && parsed.filePath === lastMatchFilePath) {
+        appendTrailingContext(lastMatch, contextLine, input.afterContext);
+      }
+      pushRollingContext(beforeBuffer, contextLine, input.beforeContext);
+
+      if (
+        limitReached &&
+        (!lastMatch ||
+          parsed.filePath !== lastMatchFilePath ||
+          lastMatch.after.length >= input.afterContext)
+      ) {
+        stopForLimit();
+        return false;
+      }
+
       return true;
     }
 
@@ -491,17 +549,11 @@ async function consumeContentOutput(
     });
     visibleMatches += 1;
     if (visibleMatches >= input.maxResults) {
-      void stopForLimit();
+      stopForLimit();
       return false;
     }
     return true;
   });
-
-  if (group.length > 0) {
-    appendContentGroup(files, group, input);
-    visibleMatches = countVisibleMatches([...files.values()]);
-    limitReached = limitReached || visibleMatches >= input.maxResults;
-  }
 
   return {
     files: [...files.values()],
