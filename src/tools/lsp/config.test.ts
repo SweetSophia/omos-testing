@@ -1,18 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import * as fs from 'node:fs';
 import { join } from 'node:path';
+import whichModule from 'which';
 
-mock.module('os', () => ({
-  homedir: () => '/home/user',
-}));
-
-// Create a mock for which.sync
-const whichSyncMock = mock(((_cmd?: string) => null) as (...args: any[]) => string | null);
 let existsSyncSpy: ReturnType<typeof spyOn> | undefined;
-mock.module('which', () => ({
-  sync: whichSyncMock,
-  default: { sync: whichSyncMock },
-}));
+let whichSyncSpy: ReturnType<typeof spyOn> | undefined;
 
 // Now import the code to test
 import { findServerForExtension, isServerInstalled } from './config';
@@ -20,11 +12,12 @@ import { findServerForExtension, isServerInstalled } from './config';
 describe('config', () => {
   beforeEach(() => {
     existsSyncSpy = spyOn(fs, 'existsSync').mockImplementation(() => false);
-    whichSyncMock.mockClear();
-    whichSyncMock.mockReturnValue(null);
+    whichSyncSpy = spyOn(whichModule, 'sync').mockReturnValue(null as any);
   });
 
   afterEach(() => {
+    whichSyncSpy?.mockRestore();
+    whichSyncSpy = undefined;
     existsSyncSpy?.mockRestore();
     existsSyncSpy = undefined;
   });
@@ -47,7 +40,7 @@ describe('config', () => {
       process.env.PATH = '/usr/local/bin:/usr/bin';
 
       // Mock whichSync to return a path (simulating the command is found)
-      whichSyncMock.mockReturnValue(
+      whichSyncSpy?.mockReturnValue(
         join('/usr/bin', 'typescript-language-server'),
       );
 
@@ -82,7 +75,7 @@ describe('config', () => {
       );
 
       // Mock whichSync to return the global bin path
-      whichSyncMock.mockReturnValue(globalBin);
+      whichSyncSpy?.mockReturnValue(globalBin);
 
       expect(isServerInstalled(['typescript-language-server'])).toBe(true);
     });
@@ -90,7 +83,7 @@ describe('config', () => {
 
   describe('findServerForExtension', () => {
     test('should skip deno for .ts when project is not a deno workspace', () => {
-      whichSyncMock.mockImplementation((cmd: string) =>
+      whichSyncSpy?.mockImplementation((cmd: string) =>
         cmd === 'typescript-language-server'
           ? join('/usr/bin', 'typescript-language-server')
           : null,
@@ -109,7 +102,7 @@ describe('config', () => {
     });
 
     test('should prefer deno for .ts in a deno workspace', () => {
-      whichSyncMock.mockImplementation((cmd: string) =>
+      whichSyncSpy?.mockImplementation((cmd: string) =>
         cmd === 'deno' ? join('/usr/bin', 'deno') : null,
       );
       (fs.existsSync as any).mockImplementation((path: string) =>
@@ -123,7 +116,7 @@ describe('config', () => {
     });
 
     test('should return found for .py extension if installed (prefers ty)', () => {
-      whichSyncMock.mockImplementation((cmd: string) =>
+      whichSyncSpy?.mockImplementation((cmd: string) =>
         cmd === 'ty' ? join('/usr/bin', 'ty') : null,
       );
       const result = findServerForExtension('.py');
@@ -139,7 +132,7 @@ describe('config', () => {
     });
 
     test('should continue to later matching servers when earlier ones are unavailable', () => {
-      whichSyncMock.mockImplementation((cmd: string) =>
+      whichSyncSpy?.mockImplementation((cmd: string) =>
         cmd === 'typescript-language-server'
           ? join('/usr/bin', 'typescript-language-server')
           : null,
