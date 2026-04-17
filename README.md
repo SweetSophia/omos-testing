@@ -404,7 +404,7 @@ If any agent fails to respond, check your provider authentication and config fil
 |-----|----------|
 | **[Skills](docs/skills.md)** | `simplify`, `agent-browser`, `cartography` — assignment syntax |
 | **[MCPs](docs/mcps.md)** | `websearch`, `context7`, `grep_app` — permissions per agent |
-| **[Tools](docs/tools.md)** | Background tasks, LSP, code search, formatters |
+| **[Tools](docs/tools.md)** | Background tasks, LSP, local `grep`, AST-grep, formatters |
 | **[Configuration](docs/configuration.md)** | Config files, prompt overriding, JSONC, full option reference |
 
 Slim only intercepts `apply_patch` before native execution. It rewrites recoverable stale patches, canonizes safe tolerant matches against the real file when unicode/trim drift is the only mismatch, keeps the authored `new_lines` bytes intact, preserves existing file EOL/final-newline state for updates, validates malformed patches strictly before helper execution, uses a conservative bounded LCS fallback, supports sequential `Update File` hunks on the same path through accumulated helper state, and blocks `apply_patch` before the native tool runs if any patch path falls outside the allowed root/worktree. This rescue does not extend to `edit` or `write`.
