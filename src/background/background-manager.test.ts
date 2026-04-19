@@ -2032,7 +2032,7 @@ describe('BackgroundTaskManager', () => {
         expect(task.questions).toEqual(['First question?', 'Second question?']);
       });
 
-      test('returns false for completed task (race window guard)', async () => {
+      test('returns terminal for completed task (race window guard)', async () => {
         const ctx = createMockContext();
         const manager = new BackgroundTaskManager(ctx);
 
@@ -2060,29 +2060,48 @@ describe('BackgroundTaskManager', () => {
         expect(task.questions).toEqual([]); // No question recorded
       });
 
-      test('persists questions to disk on each addQuestion call', async () => {
-        const ctx = createMockContext();
-        const manager = new BackgroundTaskManager(ctx);
+      describe('question disk persistence (temp-dir isolated)', () => {
+        let testDir: string;
+        const origEnv = process.env.OPENCODE_LOG_DIR;
 
-        const task = manager.launch({
-          agent: 'explorer',
-          prompt: 'find patterns',
-          description: 'test',
-          parentSessionId: 'root-session',
+        beforeEach(() => {
+          testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omo-bg-question-'));
+          process.env.OPENCODE_LOG_DIR = testDir;
         });
 
-        await Promise.resolve();
-        await Promise.resolve();
+        afterEach(() => {
+          fs.rmSync(testDir, { recursive: true, force: true });
+          if (origEnv === undefined) {
+            delete process.env.OPENCODE_LOG_DIR;
+          } else {
+            process.env.OPENCODE_LOG_DIR = origEnv;
+          }
+        });
 
-        const sessionId = task.sessionId;
-        if (!sessionId) throw new Error('Expected sessionId');
+        test('persists questions to disk on each addQuestion call', async () => {
+          const ctx = createMockContext();
+          const manager = new BackgroundTaskManager(ctx);
 
-        manager.addQuestion(sessionId, 'Should I search tests too?');
+          const task = manager.launch({
+            agent: 'explorer',
+            prompt: 'find patterns',
+            description: 'test',
+            parentSessionId: 'root-session',
+          });
 
-        // Load from disk — question should be persisted even though task is still running
-        const fromDisk = loadPersistedTask(task.id);
-        expect(fromDisk).not.toBeNull();
-        expect(fromDisk?.questions).toEqual(['Should I search tests too?']);
+          await Promise.resolve();
+          await Promise.resolve();
+
+          const sessionId = task.sessionId;
+          if (!sessionId) throw new Error('Expected sessionId');
+
+          manager.addQuestion(sessionId, 'Should I search tests too?');
+
+          // Load from disk — question should be persisted even though task is still running
+          const fromDisk = loadPersistedTask(task.id);
+          expect(fromDisk).not.toBeNull();
+          expect(fromDisk?.questions).toEqual(['Should I search tests too?']);
+        });
       });
 
       test('rejects questions beyond cap (50 questions max)', async () => {
