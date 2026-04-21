@@ -286,6 +286,12 @@ describe('tool permissions', () => {
     const explorer = agents.find((a) => a.name === 'explorer');
     expect((explorer?.config.permission as any).council_session).toBe('deny');
   });
+
+  test('councillor is denied access to council_session', () => {
+    const agents = createAgents();
+    const councillor = agents.find((a) => a.name === 'councillor');
+    expect((councillor?.config.permission as any).council_session).toBe('deny');
+  });
 });
 
 describe('isSubagent type guard', () => {

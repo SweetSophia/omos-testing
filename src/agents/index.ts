@@ -117,9 +117,9 @@ function applyDefaultPermissions(
 
   // Respect explicit deny on question (councillor)
   const questionPerm = existing.question === 'deny' ? 'deny' : 'allow';
-  const councilSessionPerm =
-    existing.council_session ??
-    (COUNCIL_TOOL_ALLOWED_AGENTS.has(agent.name) ? 'allow' : 'deny');
+  const councilSessionPerm = COUNCIL_TOOL_ALLOWED_AGENTS.has(agent.name)
+    ? (existing.council_session ?? 'allow')
+    : 'deny';
 
   agent.config.permission = {
     ...existing,
