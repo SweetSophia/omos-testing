@@ -123,7 +123,7 @@ Each councillor within a preset:
 
 - Councillors run as **agent sessions with read-only codebase access** — they can read files, search by name (glob), search by content (grep), search by AST pattern (codesearch), and query the language server (LSP). They cannot modify files, run shell commands, or spawn subagents. This makes council responses grounded in actual code rather than guessing.
 - The council agent itself synthesises the final answer from councillor results using its own model.
-- Councillor agents can be configured (model, temperature, MCPs, skills) via the standard `agents.councillor` preset override.
+- Council agent can be configured (model, temperature, MCPs, skills) via the standard `agents.council` preset override.
 
 ---
 
@@ -442,14 +442,14 @@ The council agent is registered with `mode: "all"` in the OpenCode SDK, meaning 
 
 This is intentional: council is useful both as a user-facing tool for deliberate consensus-seeking and as a subagent the orchestrator can invoke for high-stakes decisions.
 
-### Customising Councillor Agents
+### Customising Council Agent
 
-Councillor is a registered agent, so you can customise it using the standard `agents` override system:
+Council is a registered agent, so you can customise it using the standard `agents` override system:
 
 ```jsonc
 {
   "agents": {
-    "councillor": {
+    "council": {
       "model": "openai/gpt-5.4",
       "temperature": 0.3,
       "mcps": ["grep_app", "context7"]
@@ -461,7 +461,7 @@ Councillor is a registered agent, so you can customise it using the standard `ag
 **Defaults:**
 | Agent | Model | MCPs | Skills | Temperature |
 |-------|-------|------|--------|-------------|
-| `councillor` | `openai/gpt-5.4-mini` | none | none | 0.2 |
+| `council` | `openai/gpt-5.4-mini` | none | none | 0.2 |
 
 **Note:** Per-councillor model overrides in the council config (`presets.<name>.<councillor>.model`) take precedence over the agent-level default.
 
