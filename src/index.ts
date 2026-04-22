@@ -1,6 +1,7 @@
 import type { Plugin } from '@opencode-ai/plugin';
 import { createAgents, getAgentConfigs, getDisabledAgents } from './agents';
 import { buildOrchestratorPrompt } from './agents/orchestrator';
+import { createCheckpointManager } from './checkpoint';
 import { loadPluginConfig, type MultiplexerConfig } from './config';
 import { parseList } from './config/agent-mcps';
 import { CouncilManager } from './council';
@@ -109,6 +110,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
   let foregroundFallback: ForegroundFallbackManager;
   let todoContinuationHook: ReturnType<typeof createTodoContinuationHook>;
   let interviewManager: ReturnType<typeof createInterviewManager>;
+  let checkpointManager: ReturnType<typeof createCheckpointManager>;
   let councilTools: Record<string, unknown>;
   let webfetch: ReturnType<typeof createWebfetchTool>;
 
@@ -249,9 +251,11 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       autoEnableThreshold: config.todoContinuation?.autoEnableThreshold ?? 4,
     });
     interviewManager = createInterviewManager(ctx, config);
+    checkpointManager = createCheckpointManager(ctx, depthTracker);
 
     toolCount =
       Object.keys(councilTools).length +
+      Object.keys(checkpointManager.tool).length +
       Object.keys(todoContinuationHook.tool).length +
       1 + // webfetch
       2; // ast_grep_search, ast_grep_replace
@@ -319,6 +323,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
     tool: {
       ...councilTools,
       webfetch,
+      ...checkpointManager.tool,
       ...todoContinuationHook.tool,
       ast_grep_search,
       ast_grep_replace,
@@ -520,6 +525,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       }
 
       interviewManager.registerCommand(opencodeConfig);
+      checkpointManager.registerCommand(opencodeConfig);
     },
 
     event: async (input) => {
@@ -559,6 +565,11 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       await multiplexerSessionManager.onSessionDeleted(event);
 
       await interviewManager.handleEvent(
+        input as {
+          event: { type: string; properties?: Record<string, unknown> };
+        },
+      );
+      await checkpointManager.handleEvent(
         input as {
           event: { type: string; properties?: Record<string, unknown> };
         },
@@ -618,6 +629,15 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       );
 
       await interviewManager.handleCommandExecuteBefore(
+        input as {
+          command: string;
+          sessionID: string;
+          arguments: string;
+        },
+        output as { parts: Array<{ type: string; text?: string }> },
+      );
+
+      await checkpointManager.handleCommandExecuteBefore(
         input as {
           command: string;
           sessionID: string;

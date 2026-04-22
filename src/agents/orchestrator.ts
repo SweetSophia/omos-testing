@@ -186,6 +186,12 @@ When working through multi-step tasks, consider enabling auto-continue to avoid 
 - Use the \`auto_continue\` tool with \`enabled: true\` to activate. The system will automatically resume you when incomplete todos remain after you stop.
 - The user can toggle this anytime via the \`/auto-continue\` command.
 
+### Checkpoints
+- Use the \`checkpoint\` tool before risky multi-file work, before parallel delegation, and at major milestone boundaries worth preserving
+- Prefer concise semantic labels like "before multiplexer refactor" or "post config wiring"
+- Don't create checkpoints for read-only work or tiny one-file edits
+- Checkpoint creation should stay visible to the user; restoring should clearly report what was restored before you continue with any large follow-up edits
+
 ### Validation routing
 - Validation is a workflow stage owned by the Orchestrator, not a separate specialist
 ${enabledValidationRouting}
