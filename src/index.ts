@@ -28,6 +28,7 @@ import {
   ast_grep_replace,
   ast_grep_search,
   createCouncilTool,
+  createPresetManager,
   createWebfetchTool,
 } from './tools';
 import { resolveRuntimeAgentName, rewriteDisplayNameMentions } from './utils';
@@ -109,6 +110,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
   let foregroundFallback: ForegroundFallbackManager;
   let todoContinuationHook: ReturnType<typeof createTodoContinuationHook>;
   let interviewManager: ReturnType<typeof createInterviewManager>;
+  let presetManager: ReturnType<typeof createPresetManager>;
   let councilTools: Record<string, unknown>;
   let webfetch: ReturnType<typeof createWebfetchTool>;
 
@@ -249,6 +251,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       autoEnableThreshold: config.todoContinuation?.autoEnableThreshold ?? 4,
     });
     interviewManager = createInterviewManager(ctx, config);
+    presetManager = createPresetManager(ctx, config);
 
     toolCount =
       Object.keys(councilTools).length +
@@ -520,6 +523,7 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       }
 
       interviewManager.registerCommand(opencodeConfig);
+      presetManager.registerCommand(opencodeConfig);
     },
 
     event: async (input) => {
@@ -618,6 +622,15 @@ const OhMyOpenCodeLite: Plugin = async (ctx) => {
       );
 
       await interviewManager.handleCommandExecuteBefore(
+        input as {
+          command: string;
+          sessionID: string;
+          arguments: string;
+        },
+        output as { parts: Array<{ type: string; text?: string }> },
+      );
+
+      await presetManager.handleCommandExecuteBefore(
         input as {
           command: string;
           sessionID: string;
