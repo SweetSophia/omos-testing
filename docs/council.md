@@ -123,7 +123,7 @@ Each councillor within a preset:
 
 - Councillors run as **agent sessions with read-only codebase access** — they can read files, search by name (glob), search by content (grep), search by AST pattern (codesearch), and query the language server (LSP). They cannot modify files, run shell commands, or spawn subagents. This makes council responses grounded in actual code rather than guessing.
 - The council agent itself synthesises the final answer from councillor results using its own model.
-- Councillor agents can be configured (model, temperature, MCPs, skills) via the standard `agents.councillor` preset override.
+- Councillor agents can be configured (temperature, MCPs, skills) via the standard `agents.councillor` override. The model is always set per-councillor in the preset configuration.
 
 ---
 
@@ -450,7 +450,6 @@ Councillor is a registered agent, so you can customise it using the standard `ag
 {
   "agents": {
     "councillor": {
-      "model": "openai/gpt-5.4",
       "temperature": 0.3,
       "mcps": ["grep_app", "context7"]
     }
@@ -458,12 +457,12 @@ Councillor is a registered agent, so you can customise it using the standard `ag
 }
 ```
 
+**Important:** The `model` for each councillor is configured per-preset in `council.presets.<name>.<councillor>.model` (see [Councillor Configuration](#councillor-configuration) above). Settings in `agents.councillor` apply to all councillors (temperature, MCPs, skills, etc.) but the model always comes from the preset.
+
 **Defaults:**
 | Agent | Model | MCPs | Skills | Temperature |
 |-------|-------|------|--------|-------------|
-| `councillor` | `openai/gpt-5.4-mini` | none | none | 0.2 |
-
-**Note:** Per-councillor model overrides in the council config (`presets.<name>.<councillor>.model`) take precedence over the agent-level default.
+| `councillor` | `openai/gpt-5.4-mini` (fallback only) | none | none | 0.2 |
 
 ### Architecture Diagram
 
