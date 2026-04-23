@@ -632,9 +632,7 @@ function finalizeFiles(
   };
 }
 
-async function checkGnuGrep(
-  binaryPath: string,
-): Promise<GnuGrepCheckResult> {
+async function checkGnuGrep(binaryPath: string): Promise<GnuGrepCheckResult> {
   let proc: GrepProcess;
   try {
     proc = spawnRipgrep([binaryPath, '--version'], process.cwd());
@@ -670,7 +668,8 @@ async function checkGnuGrep(
   const { exitCode, stderr } = exitResult.value;
 
   if (exitCode !== 0) {
-    const error = stderr || `grep --version exited with code ${String(exitCode)}`;
+    const error =
+      stderr || `grep --version exited with code ${String(exitCode)}`;
     return {
       error,
       cacheable: shouldCacheGnuGrepFailure(undefined, stderr),

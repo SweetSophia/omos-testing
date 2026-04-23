@@ -224,7 +224,10 @@ describe('tools/grep/resolver', () => {
       logger: () => undefined,
     };
 
-    const firstWaiter = resolveGrepCliWithAutoInstall(deps, firstController.signal);
+    const firstWaiter = resolveGrepCliWithAutoInstall(
+      deps,
+      firstController.signal,
+    );
     await started;
     const secondWaiter = resolveGrepCliWithAutoInstall(deps);
 

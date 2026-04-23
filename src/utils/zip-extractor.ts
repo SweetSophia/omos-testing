@@ -68,7 +68,10 @@ export function getZipExtractionSupportError(): string | undefined {
 
     if (
       extractor === 'powershell' &&
-      !hasCommand('powershell', ['-Command', '$PSVersionTable.PSVersion.ToString()'])
+      !hasCommand('powershell', [
+        '-Command',
+        '$PSVersionTable.PSVersion.ToString()',
+      ])
     ) {
       return 'ripgrep auto-install requires PowerShell to extract zip archives on this Windows host.';
     }

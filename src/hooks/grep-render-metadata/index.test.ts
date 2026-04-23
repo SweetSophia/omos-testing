@@ -1,8 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import {
-  createGrepRenderMetadataHook,
-  parseGrepSummary,
-} from './index';
+import { createGrepRenderMetadataHook, parseGrepSummary } from './index';
 
 describe('grep render metadata hook', () => {
   test('parses match summary lines', () => {

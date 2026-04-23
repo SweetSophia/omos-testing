@@ -4,11 +4,11 @@ export { createAutoUpdateCheckerHook } from './auto-update-checker';
 export { createChatHeadersHook } from './chat-headers';
 export { createDelegateTaskRetryHook } from './delegate-task-retry';
 export { createFilterAvailableSkillsHook } from './filter-available-skills';
-export { createGrepRenderMetadataHook } from './grep-render-metadata';
 export {
   ForegroundFallbackManager,
   isRateLimitError,
 } from './foreground-fallback';
+export { createGrepRenderMetadataHook } from './grep-render-metadata';
 export { processImageAttachments } from './image-hook';
 export { createJsonErrorRecoveryHook } from './json-error-recovery';
 export { createPhaseReminderHook } from './phase-reminder';
